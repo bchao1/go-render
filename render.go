@@ -377,7 +377,13 @@ func main() {
 	upLeft := image.Point{0, 0}
 	lowRight := image.Point{width, height}
 
+	// Initialize image and fill with black
 	img := image.NewRGBA(image.Rectangle{upLeft, lowRight})
+	for i:=0;i<width;i++{
+		for j:=0;j<height;j++{
+			img.Set(i, j, color.Black)
+		}
+	}
 
 	// Render
 	//renderWireframe(&model, img, &color.RGBA{0, 0, 0, 255}, width, height, 2.0)
@@ -385,6 +391,6 @@ func main() {
 	renderTriangleMesh(&model, img, &color.RGBA{255, 255, 255, 255}, &lightDir, width, height, 1.5)
 
 	// Save
-	f, _ := os.Create("./results/gouraud.png")
+	f, _ := os.Create("./results/test.png")
 	png.Encode(f, imaging.FlipV(img))
 }
