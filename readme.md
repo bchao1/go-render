@@ -2,6 +2,6 @@
 
 This is a toy project to learn Go and rendering at the same time.
 
-![img](./wireframe.png)
+![img](./results/wireframe.png)
 
-![img](./triangle_color.png)
+![img](./results/triangle_color.png)
