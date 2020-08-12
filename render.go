@@ -418,11 +418,11 @@ func main() {
 
 	// Initialize image and fill with black
 	img := image.NewRGBA(image.Rectangle{upLeft, lowRight})
-	for i:=0;i<width;i++{
-		for j:=0;j<height;j++{
-			img.Set(i, j, color.Black)
-		}
-	}
+	//for i:=0;i<width;i++{
+	//	for j:=0;j<height;j++{
+	//		img.Set(i, j, color.Black)
+	//	}
+	//}
 
 	// Render
 	//renderWireframe(&model, img, &color.RGBA{0, 0, 0, 255}, width, height, 2.0)

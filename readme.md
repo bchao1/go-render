@@ -10,7 +10,7 @@ This is a toy project to learn Go and rendering at the same time.
 
 |||||
 |--|--|--|--|
-|![img](results/project_5.png)|![img](results/project_2.png)|![img](results/project_1.5.png)|![img](results/project_1.png)|
+|![img](results/project_5.0.png)|![img](results/project_2.0.png)|![img](results/project_1.5.png)|![img](results/project_1.0.png)|
 ## TODO
 - Center align
 - Projections
