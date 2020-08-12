@@ -93,8 +93,33 @@ func dot(v0, v1 *Vec3f) float64 {
 	return v0.x * v1.x + v0.y * v1.y + v0.z * v1.z
 }
 
-func (u *Vec3f) subtract(v *Vec3f) Vec3f{
-	return newVec3f(u.x - v.x, u.y - v.y, u.z - v.z)
+func (u *Vec3f) subtract(v *Vec3f){
+	u.x -= v.x
+	u.y -= v.y
+	u.z -= v.z
+}
+
+func (u *Vec3f) add(v *Vec3f){
+	u.x += v.x
+	u.y += v.y
+	u.z += v.z
+}
+
+func (u *Vec3f) mul(m float64, inplace bool) Vec3f{
+	if inplace {
+		u.x *= m
+		u.y *= m
+		u.z *= m
+		return *u
+	} else {
+		return newVec3f(u.x * m, u.y * m, u.z * m)
+	}
+}
+
+func (u *Vec3f) div(m float64){
+	u.x /= m
+	u.y /= m
+	u.z /= m
 }
 
 func newVec3f(x, y, z float64) Vec3f {
@@ -145,9 +170,9 @@ func (model *Model) computeFaceNormals() {
 			world_v := model.vertices[face[j]]
 			worldCoords[j] = world_v
 		}
-		v0 := worldCoords[2].subtract(&worldCoords[0])
-		v1 := worldCoords[1].subtract(&worldCoords[0])
-		n := cross(&v0, &v1)
+		worldCoords[2].subtract(&worldCoords[0])
+		worldCoords[1].subtract(&worldCoords[0])
+		n := cross(&worldCoords[2], &worldCoords[1])
 		n.normalizeL2()
 		model.faceNormals[i] = n
 	}
@@ -160,13 +185,9 @@ func (model *Model) computeVertexNormals() {
 		nfaces := len(model.vertexFaceNeighbors[i])
 		for j:=0; j<nfaces; j++ {
 			f := model.vertexFaceNeighbors[i][j]
-			n.x += model.faceNormals[f].x
-			n.y += model.faceNormals[f].y
-			n.z += model.faceNormals[f].z
+			n.add(&model.faceNormals[f])
 		}
-		n.x /= float64(nfaces)
-		n.y /= float64(nfaces)
-		n.z /= float64(nfaces)
+		n.div(float64(nfaces))
 		n.normalizeL2()
 		model.vertexNormals[i] = n
 	}
@@ -307,9 +328,12 @@ func triangle(v0 *Vec3f, v1 *Vec3f, v2 *Vec3f, vertexNormals *[]Vec3f, lightDir 
 			if (*zbuffer)[int(P.x + P.y * float64(width))] < P.z {
 				(*zbuffer)[int(P.x + P.y * float64(width))] = P.z
 				n := Vec3f{}
-				n.x = v.x * (*vertexNormals)[0].x + v.y * (*vertexNormals)[1].x + v.z * (*vertexNormals)[2].x
-				n.y = v.x * (*vertexNormals)[0].y + v.y * (*vertexNormals)[1].y + v.z * (*vertexNormals)[2].y
-				n.z = v.x * (*vertexNormals)[0].z + v.y * (*vertexNormals)[1].z + v.z * (*vertexNormals)[2].z
+				n1 := (*vertexNormals)[0].mul(v.x, false)
+				n.add(&n1)
+				n2 := (*vertexNormals)[1].mul(v.y, false)
+				n.add(&n2)
+				n3 := (*vertexNormals)[2].mul(v.z, false)
+				n.add(&n3)
 				n.normalizeL2()
 				I := dot(&n, lightDir)
 				if I > 0 {
@@ -362,7 +386,7 @@ func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, li
 
 func main() {
 	// Parse .obj file
-	relPath := "./obj/bunny.obj"
+	relPath := "./obj/african_head.obj"
 	absPath, _ := filepath.Abs(relPath)
 	model := parseObj(absPath)
 
@@ -371,7 +395,7 @@ func main() {
 	ratio := model.aspectRatio()
 
 	// Create canvas
-	height := 1000
+	height := 2000
 	width := int(ratio * float64(height))
 
 	upLeft := image.Point{0, 0}
