@@ -20,6 +20,8 @@ import (
 	// Math
 	"math"
 	"math/rand"
+	
+	"sort"
 )
 
 // 
@@ -265,15 +267,28 @@ func renderWireframe(model *Model, img *image.RGBA, color *color.RGBA, width int
 	}
 }
 
-func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, width int, height int) {
+func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, lightDir *Vec3f, width int, height int) {
 	// fill
-
-	lightDir := newVec3f(0, 0, -1)
 	lightDir.normalizeL2()
 
+	// Coarse painter's algorithm
+	sort.Slice(model.faces, func(i, j int) bool {
+		f0, f1 := model.faces[i], model.faces[j]
+		z0, z1 := 0.0, 0.0
+		for i:=0; i<len(f0); i++ {
+			z0 += model.vertices[f0[i]].z
+		}
+		z0 /= float64(len(f0))
+		for i:=0; i<len(f1); i++ {
+			z1 += model.vertices[f1[i]].z
+		}
+		z1 /= float64(len(f1))
+		return z0 < z1
+	})
+
 	for i:=0; i<model.nFaces(); i++ {
-		face := model.faces[i]
 		
+		face := model.faces[i]
 		var screenCoords [3]Vec2i
 		var worldCoords [3]Vec3f
 		for j:=0; j<3; j++ {
@@ -291,7 +306,7 @@ func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, wi
 		v1 := worldCoords[1].subtract(&worldCoords[0])
 		n := cross(&v0, &v1)
 		n.normalizeL2()
-		I := dot(&n, &lightDir)
+		I := dot(&n, lightDir)
 		if I > 0 {
 			r, g, b := I * float64(fillColor.R), I * float64(fillColor.G), I * float64(fillColor.B)
 			fill := color.RGBA{uint8(r), uint8(g), uint8(b), fillColor.A}
@@ -321,9 +336,10 @@ func main() {
 
 	// Render
 	//renderWireframe(&model, img, &color.RGBA{0, 0, 0, 255}, width, height)
-	renderTriangleMesh(&model, img, &color.RGBA{255, 255, 255, 255}, width, height)
+	lightDir := newVec3f(0, 0, -1)
+	renderTriangleMesh(&model, img, &color.RGBA{255, 255, 255, 255}, &lightDir, width, height)
 
 	// Save
-	f, _ := os.Create("./results/test.png")
+	f, _ := os.Create("./results/backface_culling.png")
 	png.Encode(f, imaging.FlipV(img))
 }
