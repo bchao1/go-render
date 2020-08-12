@@ -21,7 +21,7 @@ import (
 	"math"
 	"math/rand"
 	
-	"sort"
+	//"sort"
 )
 
 // 
@@ -53,6 +53,18 @@ func barycentric(pts *[]*Vec2i, P *Vec2i) Vec3f{
 	return newVec3f(1.0 - (u.x + u.y) / u.z, u.x / u.z, u.y / u.z)
 }
 
+// Vec2f float
+
+type Vec2f struct {
+	x float64 
+	y float64
+}
+
+func newVec2f(x, y float64) Vec2f {
+	v := Vec2f{x: x, y: y}
+	return v
+}
+
 // Vec3f float
 type Vec3f struct {
 	x float64
@@ -80,7 +92,6 @@ func newVec3f(x, y, z float64) Vec3f {
 	v := Vec3f{x: x, y: y, z: z}
 	return v
 }
-
 
 func (v *Vec3f) normalizeMinMax2D(m *Model) (float64, float64){
 	x := (v.x - m.min_x) / (m.max_x - m.min_x) - 0.5
@@ -223,19 +234,20 @@ func triangle(v0 *Vec2i, v1 *Vec2i, v2 *Vec2i, img *image.RGBA, color *color.RGB
 	
 	pts := []*Vec2i{v0, v1, v2}
 
-	bboxmin := newVec2i(width - 1, height - 1)
-	bboxmax := newVec2i(0, 0)
+	bboxmin := newVec2f(math.Inf(1), math.Inf(1))
+	bboxmax := newVec2f(math.Inf(-1), math.Inf(-1))
+	clamp := newVec2f(float64(width - 1), float64(height - 1))
 
 	for i:=0; i<len(pts); i++ {
-		bboxmin.x = int(math.Min(float64(bboxmin.x), float64(pts[i].x)))
-		bboxmin.y = int(math.Min(float64(bboxmin.y), float64(pts[i].y)))
-		bboxmax.x = int(math.Max(float64(bboxmax.x), float64(pts[i].x)))
-		bboxmax.y = int(math.Max(float64(bboxmax.y), float64(pts[i].y)))
+		bboxmin.x = math.Max(0.0, math.Min(bboxmin.x, float64(pts[i].x)))
+		bboxmin.y = math.Max(0.0, math.Min(bboxmin.y, float64(pts[i].y)))
+		bboxmax.x = math.Min(clamp.x, math.Max(bboxmax.x, float64(pts[i].x)))
+		bboxmax.y = math.Min(clamp.y, math.Max(bboxmax.y, float64(pts[i].y)))
 	}
 
 	P := Vec2i{}
-	for P.x=bboxmin.x; P.x<bboxmax.x; P.x++ {
-		for P.y=bboxmin.y; P.y<bboxmax.y; P.y++ {
+	for P.x=int(bboxmin.x); P.x<int(bboxmax.x); P.x++ {
+		for P.y=int(bboxmin.y); P.y<int(bboxmax.y); P.y++ {
 			v := barycentric(&pts, &P)
 			if v.x < 0 || v.y < 0 || v.z < 0 {
 				continue
@@ -271,7 +283,7 @@ func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, li
 	// fill
 	lightDir.normalizeL2()
 
-	// Coarse painter's algorithm
+	// Coarse painter's algorithm, average z value
 	sort.Slice(model.faces, func(i, j int) bool {
 		f0, f1 := model.faces[i], model.faces[j]
 		z0, z1 := 0.0, 0.0
@@ -285,6 +297,11 @@ func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, li
 		z1 /= float64(len(f1))
 		return z0 < z1
 	})
+
+	var zbuffer = make([]float64, width * height)
+	for i:=0; i<len(zbuffer); i++ {
+		zbuffer[i] = math.Inf(-1)
+	}
 
 	for i:=0; i<model.nFaces(); i++ {
 		
@@ -317,7 +334,7 @@ func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, li
 
 func main() {
 	// Parse .obj file
-	relPath := "./obj/bunny.obj"
+	relPath := "./obj/african_head.obj"
 	absPath, _ := filepath.Abs(relPath)
 	model := parseObj(absPath)
 
@@ -340,6 +357,6 @@ func main() {
 	renderTriangleMesh(&model, img, &color.RGBA{255, 255, 255, 255}, &lightDir, width, height)
 
 	// Save
-	f, _ := os.Create("./results/backface_culling.png")
+	f, _ := os.Create("./results/test.png")
 	png.Encode(f, imaging.FlipV(img))
 }
