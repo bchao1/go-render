@@ -32,6 +32,15 @@ func randColor() color.RGBA {
 	return color.RGBA{r, g, b, 255}
 }
 
+func worldToScreen(v *Vec3f, model *Model, width int, height int, scale float64) Vec3f {
+	x, y := v.normalizeMinMax2D(model)  // normalize w.r.t min, max boundaries
+
+	x = (x + 0.5 * scale) * float64(width)  / scale
+	y = (y + 0.5 * scale) * float64(height) / scale
+
+	return newVec3f(float64(int(x)), float64(int(y)), v.z)
+} 
+
 // Vec2i integer
 type Vec2i struct {
 	x int
@@ -110,6 +119,11 @@ func (v *Vec3f) normalizeL2() {
 type Model struct {
 	vertices []Vec3f
 	faces [][]int
+	
+	vertexFaceNeighbors [][]int
+
+	faceNormals []Vec3f
+	vertexNormals []Vec3f
 
 	min_x float64
 	min_y float64
@@ -120,6 +134,42 @@ type Model struct {
 func newModel() Model{
 	m := Model{min_x: 1e10, min_y: 1e10, max_x: -1e10, max_y: -1e10}
 	return m
+}
+
+func (model *Model) computeFaceNormals() {
+	model.faceNormals = make([]Vec3f, model.nFaces())
+	for i:=0; i<model.nFaces(); i++ {
+		face := model.faces[i]
+		var worldCoords [3]Vec3f
+		for j:=0; j<3; j++ {
+			world_v := model.vertices[face[j]]
+			worldCoords[j] = world_v
+		}
+		v0 := worldCoords[2].subtract(&worldCoords[0])
+		v1 := worldCoords[1].subtract(&worldCoords[0])
+		n := cross(&v0, &v1)
+		n.normalizeL2()
+		model.faceNormals[i] = n
+	}
+}
+
+func (model *Model) computeVertexNormals() {
+	model.vertexNormals = make([]Vec3f, model.nVertices())
+	for i:=0; i<model.nVertices(); i++ {
+		n := newVec3f(0.0, 0.0, 0.0)
+		nfaces := len(model.vertexFaceNeighbors[i])
+		for j:=0; j<nfaces; j++ {
+			f := model.vertexFaceNeighbors[i][j]
+			n.x += model.faceNormals[f].x
+			n.y += model.faceNormals[f].y
+			n.z += model.faceNormals[f].z
+		}
+		n.x /= float64(nfaces)
+		n.y /= float64(nfaces)
+		n.z /= float64(nfaces)
+		n.normalizeL2()
+		model.vertexNormals[i] = n
+	}
 }
 
 func (m *Model) aspectRatio() float64 {
@@ -167,6 +217,7 @@ func parseObj(filePath string) Model {
 				model.setMinMax(x, y)
 				v := newVec3f(x, y, z)
 				model.addVertex(&v)
+				model.vertexFaceNeighbors = append(model.vertexFaceNeighbors, make([]int, 0))
 			} else if tok[0] == "f" {
 				var vs []int
 				for i:=1; i<len(tok); i++ {
@@ -177,17 +228,26 @@ func parseObj(filePath string) Model {
 			}
 		}
 	}
+	for i:=0; i<model.nFaces(); i++ {
+		//fmt.Println(model.faces[i])
+		for j:=0; j<len(model.faces[i]); j++ {
+			v := model.faces[i][j]
+			model.vertexFaceNeighbors[v] = append(model.vertexFaceNeighbors[v], i)
+		} 
+	}
+	model.computeFaceNormals()
+	model.computeVertexNormals()
 	return model
 }
 
 // Rendering 
 
-func line(v0 *Vec2i, v1 *Vec2i, img *image.RGBA, color *color.RGBA) {
+func line(v0 *Vec3f, v1 *Vec3f, img *image.RGBA, color *color.RGBA) {
 	x0, y0 := v0.x, v0.y
 	x1, y1 := v1.x, v1.y
 
 	var steep bool = false
-	if math.Abs(float64(x0 - x1)) < math.Abs(float64(y0 - y1)) {
+	if math.Abs(x0 - x1) < math.Abs(y0 - y1) {
 		x0, y0 = y0, x0
 		x1, y1 = y1, x1
 		steep = true
@@ -197,13 +257,13 @@ func line(v0 *Vec2i, v1 *Vec2i, img *image.RGBA, color *color.RGBA) {
 		y0, y1 = y1, y0
 	}
 
-	var dx float64 = float64(x1 - x0)
-	var dy float64 = float64(y1 - y0)
+	var dx float64 = x1 - x0
+	var dy float64 = y1 - y0
 	var derr float64 = math.Abs(dy / dx)
 	var err float64 = 0.0
-	var y int = y0
+	var y int = int(y0)
 
-	for x:=x0; x <= x1; x++ {
+	for x:=int(x0); x <= int(x1); x++ {
 		if steep {
 			img.Set(y, x, *color)
 		} else {
@@ -221,7 +281,7 @@ func line(v0 *Vec2i, v1 *Vec2i, img *image.RGBA, color *color.RGBA) {
 	}
 }
 
-func triangle(v0 *Vec3f, v1 *Vec3f, v2 *Vec3f, img *image.RGBA, zbuffer *[]float64, color *color.RGBA, width int, height int) {
+func triangle(v0 *Vec3f, v1 *Vec3f, v2 *Vec3f, vertexNormals *[]Vec3f, lightDir *Vec3f, img *image.RGBA, zbuffer *[]float64, fillColor *color.RGBA, width int, height int) {
 
 	pts := []*Vec3f{v0, v1, v2}
 
@@ -246,35 +306,38 @@ func triangle(v0 *Vec3f, v1 *Vec3f, v2 *Vec3f, img *image.RGBA, zbuffer *[]float
 			P.z = v.x * pts[0].z + v.y * pts[1].z + v.z * pts[2].z
 			if (*zbuffer)[int(P.x + P.y * float64(width))] < P.z {
 				(*zbuffer)[int(P.x + P.y * float64(width))] = P.z
-				img.Set(int(P.x), int(P.y), *color)
+				n := Vec3f{}
+				n.x = v.x * (*vertexNormals)[0].x + v.y * (*vertexNormals)[1].x + v.z * (*vertexNormals)[2].x
+				n.y = v.x * (*vertexNormals)[0].y + v.y * (*vertexNormals)[1].y + v.z * (*vertexNormals)[2].y
+				n.z = v.x * (*vertexNormals)[0].z + v.y * (*vertexNormals)[1].z + v.z * (*vertexNormals)[2].z
+				n.normalizeL2()
+				I := dot(&n, lightDir)
+				if I > 0 {
+					fill := color.RGBA{uint8(float64(fillColor.R) * I),uint8(float64(fillColor.G) * I),uint8(float64(fillColor.B) * I), fillColor.A}
+					img.Set(int(P.x), int(P.y), fill)
+				}
 			}
 		}
 	}
 }
 
-func renderWireframe(model *Model, img *image.RGBA, color *color.RGBA, width int, height int) {
+func renderWireframe(model *Model, img *image.RGBA, color *color.RGBA, width int, height int, scale float64) {
 	// fill
 	for i:=0; i<model.nFaces(); i++ {
 		face := model.faces[i]
 		for j:=0; j<len(face); j++ {
-			v0 := model.vertices[face[j]]
-			v1 := model.vertices[face[(j+1)%len(face)]]
+			world_v0 := model.vertices[face[j]]
+			world_v1 := model.vertices[face[(j+1)%len(face)]]
 
-			x0, y0 := v0.normalizeMinMax2D(model)  // normalize w.r.t min, max boundaries
-			x1, y1 := v1.normalizeMinMax2D(model)
-
-			scale := 1.5
-			x0 = (x0 + 0.5 * scale) * float64(width)  / scale
-			y0 = (y0 + 0.5 * scale) * float64(height) / scale
-			x1 = (y1 + 0.5 * scale) * float64(width)  / scale
-			y1 = (y0 + 0.5 * scale) * float64(height) / scale
-
-			line(&Vec2i{x:int(x0), y:int(y0)}, &Vec2i{x:int(x1), y:int(y1)}, img, color)
+			screen_v0 := worldToScreen(&world_v0, model, width, height, scale)
+			screen_v1 := worldToScreen(&world_v1, model, width, height, scale)
+			
+			line(&screen_v0, &screen_v1, img, color)
 		}
 	}
 }
 
-func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, lightDir *Vec3f, width int, height int) {
+func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, lightDir *Vec3f, width int, height int, scale float64) {
 	// fill
 	lightDir.normalizeL2()
 
@@ -284,31 +347,16 @@ func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, li
 	}
 
 	for i:=0; i<model.nFaces(); i++ {
-		
 		face := model.faces[i]
 		var screenCoords [3]Vec3f
-		var worldCoords [3]Vec3f
+		var vertexNormals = make([]Vec3f, 3)
 		for j:=0; j<3; j++ {
-			v := model.vertices[face[j]]
-			x, y := v.normalizeMinMax2D(model)  // normalize w.r.t min, max boundaries
-
-			scale := 1.5
-			x = (x + 0.5 * scale) * float64(width)  / scale
-			y = (y + 0.5 * scale) * float64(height) / scale
-			
-			screenCoords[j] = newVec3f(float64(int(x)), float64(int(y)), v.z)
-			worldCoords[j] = v
+			vs := face[j]
+			world_v := model.vertices[vs]
+			screenCoords[j] = worldToScreen(&world_v, model, width, height, scale)
+			vertexNormals[j] = model.vertexNormals[vs]
 		}
-		v0 := worldCoords[2].subtract(&worldCoords[0])
-		v1 := worldCoords[1].subtract(&worldCoords[0])
-		n := cross(&v0, &v1)
-		n.normalizeL2()
-		I := dot(&n, lightDir)
-		if I > 0 {
-			r, g, b := I * float64(fillColor.R), I * float64(fillColor.G), I * float64(fillColor.B)
-			fill := color.RGBA{uint8(r), uint8(g), uint8(b), fillColor.A}
-			triangle(&screenCoords[0], &screenCoords[1], &screenCoords[2], img, &zbuffer, &fill, width, height)
-		}
+		triangle(&screenCoords[0], &screenCoords[1], &screenCoords[2], &vertexNormals, lightDir, img, &zbuffer, fillColor, width, height)
 	}
 }
 
@@ -332,11 +380,11 @@ func main() {
 	img := image.NewRGBA(image.Rectangle{upLeft, lowRight})
 
 	// Render
-	//renderWireframe(&model, img, &color.RGBA{0, 0, 0, 255}, width, height)
+	//renderWireframe(&model, img, &color.RGBA{0, 0, 0, 255}, width, height, 2.0)
 	lightDir := newVec3f(0, 0, -1)
-	renderTriangleMesh(&model, img, &color.RGBA{255, 255, 255, 255}, &lightDir, width, height)
+	renderTriangleMesh(&model, img, &color.RGBA{255, 255, 255, 255}, &lightDir, width, height, 1.5)
 
 	// Save
-	f, _ := os.Create("./results/triangle_zbuffer.png")
+	f, _ := os.Create("./results/gouraud.png")
 	png.Encode(f, imaging.FlipV(img))
 }

@@ -2,8 +2,8 @@
 
 This is a toy project to learn Go and rendering at the same time.
 
-![img](./results/wireframe.png)
-
-![img](./results/triangle_color.png)
-
-![img](./results/triangle_zbuffer.png)
+|Wireframe|Random Color|
+|--|--|
+|![img](./results/wireframe.png)|![img](./results/triangle_color.png)|
+|Triangle rasterization|Gouraud shading|
+|![img](./results/triangle_zbuffer.png)|![img](./results/gouraud.png)|
