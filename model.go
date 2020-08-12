@@ -35,9 +35,9 @@ func line(x0 int, y0 int, x1 int, y1 int, img *image.RGBA) {
 
 	for x:=x0; x <= x1; x++ {
 		if steep {
-			img.Set(y, x, color.White)
+			img.Set(y, x, color.Black)
 		} else {
-			img.Set(x, y, color.White)
+			img.Set(x, y, color.Black)
 		}
 		err += derr 
 		if err > 0.5 {
