@@ -34,10 +34,9 @@ func randColor() color.RGBA {
 
 func worldToScreen(v *Vec3f, model *Model, width int, height int, scale float64) Vec3f {
 	x, y := v.normalizeMinMax2D(model)  // normalize w.r.t min, max boundaries
-
-	x = (x + 0.5 * scale) * float64(width)  / scale
-	y = (y + 0.5 * scale) * float64(height) / scale
-
+	// Center align
+	x = float64(width) * ((x - 0.5) / scale + 0.5)
+	y = float64(height) * ((y - 0.5) / scale + 0.5)
 	return newVec3f(float64(int(x)), float64(int(y)), v.z)
 } 
 
@@ -89,6 +88,7 @@ func cross(v0, v1 *Vec3f) Vec3f {
 	return newVec3f(x, y, z)
 }
 
+
 func dot(v0, v1 *Vec3f) float64 {
 	return v0.x * v1.x + v0.y * v1.y + v0.z * v1.z
 }
@@ -116,10 +116,19 @@ func (u *Vec3f) mul(m float64, inplace bool) Vec3f{
 	}
 }
 
-func (u *Vec3f) div(m float64){
-	u.x /= m
-	u.y /= m
-	u.z /= m
+func (u *Vec3f) div(m float64, inplace bool) Vec3f{
+	if inplace {
+		u.x /= m
+		u.y /= m
+		u.z /= m
+		return *u
+	} else {
+		return newVec3f(u.x / m, u.y / m, u.z / m)
+	}
+}
+
+func (v *Vec3f) project(c float64) Vec3f {
+	return v.div(1 - v.z / c, false)
 }
 
 func newVec3f(x, y, z float64) Vec3f {
@@ -128,8 +137,8 @@ func newVec3f(x, y, z float64) Vec3f {
 }
 
 func (v *Vec3f) normalizeMinMax2D(m *Model) (float64, float64){
-	x := (v.x - m.min_x) / (m.max_x - m.min_x) - 0.5
-	y := (v.y - m.min_y) / (m.max_y - m.min_y) - 0.5
+	x := (v.x - m.min_x) / (m.max_x - m.min_x)
+	y := (v.y - m.min_y) / (m.max_y - m.min_y)
 	return x, y
 }
 
@@ -187,7 +196,7 @@ func (model *Model) computeVertexNormals() {
 			f := model.vertexFaceNeighbors[i][j]
 			n.add(&model.faceNormals[f])
 		}
-		n.div(float64(nfaces))
+		n.div(float64(nfaces), true)
 		n.normalizeL2()
 		model.vertexNormals[i] = n
 	}
@@ -361,7 +370,7 @@ func renderWireframe(model *Model, img *image.RGBA, color *color.RGBA, width int
 	}
 }
 
-func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, lightDir *Vec3f, width int, height int, scale float64) {
+func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, lightDir *Vec3f, width int, height int, scale float64, project float64) {
 	// fill
 	lightDir.normalizeL2()
 
@@ -369,6 +378,12 @@ func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, li
 	for i:=0; i<len(zbuffer); i++ {
 		zbuffer[i] = math.Inf(-1)
 	}
+
+	for i:=0; i<model.nVertices(); i++ {
+		model.vertices[i] = model.vertices[i].project(project)
+	}
+	model.computeFaceNormals()
+	model.computeVertexNormals()
 
 	for i:=0; i<model.nFaces(); i++ {
 		face := model.faces[i]
@@ -412,9 +427,10 @@ func main() {
 	// Render
 	//renderWireframe(&model, img, &color.RGBA{0, 0, 0, 255}, width, height, 2.0)
 	lightDir := newVec3f(0, 0, -1)
-	renderTriangleMesh(&model, img, &color.RGBA{255, 255, 255, 255}, &lightDir, width, height, 1.5)
+	p := 1.5
+	renderTriangleMesh(&model, img, &color.RGBA{255, 255, 255, 255}, &lightDir, width, height, 1.5, p)
 
 	// Save
-	f, _ := os.Create("./results/test.png")
+	f, _ := os.Create("./results/project_1.5.png")
 	png.Encode(f, imaging.FlipV(img))
 }
