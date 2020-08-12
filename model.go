@@ -1,20 +1,25 @@
 package main 
 
 import (
+	// Basic
 	"fmt"
 	"bufio"
 	"os"
-	//"reflect"
+
+	// Strings 
 	"strings"
 	"strconv"
 	
+	// Image manipulation
 	"image"
 	"image/color"
 	"image/png"
-
-	"math"
 	"github.com/disintegration/imaging"
+
+	// Math
+	"math"
 )
+
 func line(x0 int, y0 int, x1 int, y1 int, img *image.RGBA) {
 	var steep bool = false
 	if math.Abs(float64(x0 - x1)) < math.Abs(float64(y0 - y1)) {
@@ -51,21 +56,24 @@ func line(x0 int, y0 int, x1 int, y1 int, img *image.RGBA) {
 	}
 }
 
+// Vec3d
 type Vec3d struct {
 	x float64
 	y float64 
 	z float64
 }
+func newVec3d(x, y, z float64) Vec3d {
+	v := Vec3d{x: x, y: y, z: z}
+	return v
+}
+
 
 func (v *Vec3d) normalize(m *Model) {
 	(*v).x = ((*v).x - (*m).min_x) / ((*m).max_x - (*m).min_x) - 0.5
 	(*v).y = ((*v).y - (*m).min_y) / ((*m).max_y - (*m).min_y) - 0.5
 }
 
-type Face struct {
-	v []int
-}
-
+// Model
 type Model struct {
 	vertices []Vec3d
 	faces [][]int
@@ -74,6 +82,11 @@ type Model struct {
 	min_y float64
 	max_x float64
 	max_y float64
+}
+
+func newModel() Model{
+	m := Model{min_x: 1e10, min_y: 1e10, max_x: -1e10, max_y: -1e10}
+	return m
 }
 
 func (m *Model) addVertex(v *Vec3d){
@@ -99,17 +112,7 @@ func (m *Model) setMinMax(x, y float64) {
 	(*m).max_y = math.Max((*m).max_y, y)
 }
 
-func newVec3d(x, y, z float64) Vec3d {
-	v := Vec3d{x: x, y: y, z: z}
-	return v
-}
-
-func newModel() Model{
-	m := Model{min_x: 1e10, min_y: 1e10, max_x: -1e10, max_y: -1e10}
-	return m
-}
-
-func main() {
+func parseObj(file_path string) Model {
 	file, _ := os.Open("./bunny.obj")
 	defer file.Close()
 
@@ -135,26 +138,19 @@ func main() {
 			}
 		}
 	}
-	fmt.Println("Number of faces: ", model.nFaces())
-	fmt.Println("Number of vertices: ", model.nVertices())
+	return model
+}
 
-	width := 1000
-	height := 1000
-
-	upLeft := image.Point{0, 0}
-	lowRight := image.Point{width, height}
-
-	img := image.NewRGBA(image.Rectangle{upLeft, lowRight})
-
+func renderWireframe(model *Model, img *image.RGBA, width int, height int) {
 	// fill
-	for i:=0; i<model.nFaces(); i++ {
-		face := model.faces[i]
+	for i:=0; i<(*model).nFaces(); i++ {
+		face := (*model).faces[i]
 		for j:=0; j<len(face); j++ {
-			v0 := model.vertices[face[j]]
-			v1 := model.vertices[face[(j+1)%len(face)]]
+			v0 := (*model).vertices[face[j]]
+			v1 := (*model).vertices[face[(j+1)%len(face)]]
 
-			v0.normalize(&model)  // normalize w.r.t min, max boundaries
-			v1.normalize(&model)
+			v0.normalize(model)  // normalize w.r.t min, max boundaries
+			v1.normalize(model)
 
 			scale := 1.5
 			x0 := int((v0.x + 0.5 * scale) * float64(width)  / scale)
@@ -165,6 +161,28 @@ func main() {
 			line(x0, y0, x1, y1, img)
 		}
 	}
+}
+
+func main() {
+	// Parse .obj file
+	model := parseObj("./bunny.obj")
+
+	fmt.Println("Number of faces: ", model.nFaces())
+	fmt.Println("Number of vertices: ", model.nVertices())
+
+	// Create canvas
+	width := 1000
+	height := 1000
+
+	upLeft := image.Point{0, 0}
+	lowRight := image.Point{width, height}
+
+	img := image.NewRGBA(image.Rectangle{upLeft, lowRight})
+
+	// Render
+	renderWireframe(&model, img, width, height)
+
+	// Save
 	f, _ := os.Create("image.png")
 	png.Encode(f, imaging.FlipV(img))
 }
