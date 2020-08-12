@@ -43,14 +43,14 @@ func newVec2i(x, y int) Vec2i {
 	return v 
 }
 
-func barycentric(pts *[]*Vec2i, P *Vec2i) Vec3f{
+func barycentric(pts *[]*Vec3f, P *Vec3f) Vec3f{
 	v0 := newVec3f(float64((*pts)[1].x - (*pts)[0].x), float64((*pts)[2].x - (*pts)[0].x), float64((*pts)[0].x - P.x))
 	v1 := newVec3f(float64((*pts)[1].y - (*pts)[0].y), float64((*pts)[2].y - (*pts)[0].y), float64((*pts)[0].y - P.y))
 	u := cross(&v0, &v1)
-	if math.Abs(u.z) < 1 {
-		return newVec3f(-1, 1, 1)
+	if math.Abs(u.z) > 1e-2 {
+		return newVec3f(1.0 - (u.x + u.y) / u.z, u.x / u.z, u.y / u.z)
 	}
-	return newVec3f(1.0 - (u.x + u.y) / u.z, u.x / u.z, u.y / u.z)
+	return newVec3f(-1, 1, 1)
 }
 
 // Vec2f float
@@ -221,18 +221,9 @@ func line(v0 *Vec2i, v1 *Vec2i, img *image.RGBA, color *color.RGBA) {
 	}
 }
 
-func triangle(v0 *Vec2i, v1 *Vec2i, v2 *Vec2i, img *image.RGBA, color *color.RGBA, width int, height int) {
-	if v0.y > v1.y {
-		v0, v1 = v1, v0
-	}
-	if v0.y > v2.y {
-		v0, v2 = v2, v0
-	}
-	if v1.y > v2.y {
-		v1, v2 = v2, v1
-	}
-	
-	pts := []*Vec2i{v0, v1, v2}
+func triangle(v0 *Vec3f, v1 *Vec3f, v2 *Vec3f, img *image.RGBA, zbuffer *[]float64, color *color.RGBA, width int, height int) {
+
+	pts := []*Vec3f{v0, v1, v2}
 
 	bboxmin := newVec2f(math.Inf(1), math.Inf(1))
 	bboxmax := newVec2f(math.Inf(-1), math.Inf(-1))
@@ -245,14 +236,18 @@ func triangle(v0 *Vec2i, v1 *Vec2i, v2 *Vec2i, img *image.RGBA, color *color.RGB
 		bboxmax.y = math.Min(clamp.y, math.Max(bboxmax.y, float64(pts[i].y)))
 	}
 
-	P := Vec2i{}
-	for P.x=int(bboxmin.x); P.x<int(bboxmax.x); P.x++ {
-		for P.y=int(bboxmin.y); P.y<int(bboxmax.y); P.y++ {
+	P := Vec3f{}
+	for P.x=bboxmin.x; P.x<bboxmax.x; P.x++ {
+		for P.y=bboxmin.y; P.y<bboxmax.y; P.y++ {
 			v := barycentric(&pts, &P)
 			if v.x < 0 || v.y < 0 || v.z < 0 {
 				continue
 			}
-			img.Set(P.x, P.y, *color)
+			P.z = v.x * pts[0].z + v.y * pts[1].z + v.z * pts[2].z
+			if (*zbuffer)[int(P.x + P.y * float64(width))] < P.z {
+				(*zbuffer)[int(P.x + P.y * float64(width))] = P.z
+				img.Set(int(P.x), int(P.y), *color)
+			}
 		}
 	}
 }
@@ -283,21 +278,6 @@ func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, li
 	// fill
 	lightDir.normalizeL2()
 
-	// Coarse painter's algorithm, average z value
-	sort.Slice(model.faces, func(i, j int) bool {
-		f0, f1 := model.faces[i], model.faces[j]
-		z0, z1 := 0.0, 0.0
-		for i:=0; i<len(f0); i++ {
-			z0 += model.vertices[f0[i]].z
-		}
-		z0 /= float64(len(f0))
-		for i:=0; i<len(f1); i++ {
-			z1 += model.vertices[f1[i]].z
-		}
-		z1 /= float64(len(f1))
-		return z0 < z1
-	})
-
 	var zbuffer = make([]float64, width * height)
 	for i:=0; i<len(zbuffer); i++ {
 		zbuffer[i] = math.Inf(-1)
@@ -306,7 +286,7 @@ func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, li
 	for i:=0; i<model.nFaces(); i++ {
 		
 		face := model.faces[i]
-		var screenCoords [3]Vec2i
+		var screenCoords [3]Vec3f
 		var worldCoords [3]Vec3f
 		for j:=0; j<3; j++ {
 			v := model.vertices[face[j]]
@@ -316,7 +296,7 @@ func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, li
 			x = (x + 0.5 * scale) * float64(width)  / scale
 			y = (y + 0.5 * scale) * float64(height) / scale
 			
-			screenCoords[j] = newVec2i(int(x), int(y))
+			screenCoords[j] = newVec3f(float64(int(x)), float64(int(y)), v.z)
 			worldCoords[j] = v
 		}
 		v0 := worldCoords[2].subtract(&worldCoords[0])
@@ -327,14 +307,14 @@ func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, li
 		if I > 0 {
 			r, g, b := I * float64(fillColor.R), I * float64(fillColor.G), I * float64(fillColor.B)
 			fill := color.RGBA{uint8(r), uint8(g), uint8(b), fillColor.A}
-			triangle(&screenCoords[0], &screenCoords[1], &screenCoords[2], img, &fill, width, height)
+			triangle(&screenCoords[0], &screenCoords[1], &screenCoords[2], img, &zbuffer, &fill, width, height)
 		}
 	}
 }
 
 func main() {
 	// Parse .obj file
-	relPath := "./obj/african_head.obj"
+	relPath := "./obj/bunny.obj"
 	absPath, _ := filepath.Abs(relPath)
 	model := parseObj(absPath)
 
@@ -357,6 +337,6 @@ func main() {
 	renderTriangleMesh(&model, img, &color.RGBA{255, 255, 255, 255}, &lightDir, width, height)
 
 	// Save
-	f, _ := os.Create("./results/test.png")
+	f, _ := os.Create("./results/triangle_zbuffer.png")
 	png.Encode(f, imaging.FlipV(img))
 }
