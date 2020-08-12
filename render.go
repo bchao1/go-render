@@ -66,15 +66,31 @@ func cross(v0, v1 *Vec3f) Vec3f {
 	return newVec3f(x, y, z)
 }
 
+func dot(v0, v1 *Vec3f) float64 {
+	return v0.x * v1.x + v0.y * v1.y + v0.z * v1.z
+}
+
+func (u *Vec3f) subtract(v *Vec3f) Vec3f{
+	return newVec3f(u.x - v.x, u.y - v.y, u.z - v.z)
+}
+
 func newVec3f(x, y, z float64) Vec3f {
 	v := Vec3f{x: x, y: y, z: z}
 	return v
 }
 
 
-func (v *Vec3f) normalize(m *Model) {
-	v.x = (v.x - m.min_x) / (m.max_x - m.min_x) - 0.5
-	v.y = (v.y - m.min_y) / (m.max_y - m.min_y) - 0.5
+func (v *Vec3f) normalizeMinMax2D(m *Model) (float64, float64){
+	x := (v.x - m.min_x) / (m.max_x - m.min_x) - 0.5
+	y := (v.y - m.min_y) / (m.max_y - m.min_y) - 0.5
+	return x, y
+}
+
+func (v *Vec3f) normalizeL2() {
+	norm := math.Sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+	v.x /= norm
+	v.y /= norm 
+	v.z /= norm
 }
 
 // Model
@@ -91,6 +107,12 @@ type Model struct {
 func newModel() Model{
 	m := Model{min_x: 1e10, min_y: 1e10, max_x: -1e10, max_y: -1e10}
 	return m
+}
+
+func (m *Model) aspectRatio() float64 {
+	dx := m.max_x - m.min_x
+	dy := m.max_y - m.min_y
+	return dx / dy
 }
 
 func (m *Model) addVertex(v *Vec3f){
@@ -229,38 +251,52 @@ func renderWireframe(model *Model, img *image.RGBA, color *color.RGBA, width int
 			v0 := model.vertices[face[j]]
 			v1 := model.vertices[face[(j+1)%len(face)]]
 
-			v0.normalize(model)  // normalize w.r.t min, max boundaries
-			v1.normalize(model)
+			x0, y0 := v0.normalizeMinMax2D(model)  // normalize w.r.t min, max boundaries
+			x1, y1 := v1.normalizeMinMax2D(model)
 
 			scale := 1.5
-			x0 := int((v0.x + 0.5 * scale) * float64(width)  / scale)
-			y0 := int((v0.y + 0.5 * scale) * float64(height) / scale)
-			x1 := int((v1.x + 0.5 * scale) * float64(width)  / scale)
-			y1 := int((v1.y + 0.5 * scale) * float64(height) / scale)
+			x0 = (x0 + 0.5 * scale) * float64(width)  / scale
+			y0 = (y0 + 0.5 * scale) * float64(height) / scale
+			x1 = (y1 + 0.5 * scale) * float64(width)  / scale
+			y1 = (y0 + 0.5 * scale) * float64(height) / scale
 
-			line(&Vec2i{x:x0, y:y0}, &Vec2i{x:x1, y:y1}, img, color)
+			line(&Vec2i{x:int(x0), y:int(y0)}, &Vec2i{x:int(x1), y:int(y1)}, img, color)
 		}
 	}
 }
 
-func renderTriangleMesh(model *Model, img *image.RGBA, color *color.RGBA, width int, height int) {
+func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, width int, height int) {
 	// fill
+
+	lightDir := newVec3f(0, 0, -1)
+	lightDir.normalizeL2()
+
 	for i:=0; i<model.nFaces(); i++ {
 		face := model.faces[i]
 		
-		var screen_coords [3]Vec2i
+		var screenCoords [3]Vec2i
+		var worldCoords [3]Vec3f
 		for j:=0; j<3; j++ {
 			v := model.vertices[face[j]]
-			v.normalize(model)  // normalize w.r.t min, max boundaries
+			x, y := v.normalizeMinMax2D(model)  // normalize w.r.t min, max boundaries
 
 			scale := 1.5
-			x := int((v.x + 0.5 * scale) * float64(width)  / scale)
-			y := int((v.y + 0.5 * scale) * float64(height) / scale)
-
-			screen_coords[j] = newVec2i(x, y)
+			x = (x + 0.5 * scale) * float64(width)  / scale
+			y = (y + 0.5 * scale) * float64(height) / scale
+			
+			screenCoords[j] = newVec2i(int(x), int(y))
+			worldCoords[j] = v
 		}
-		fill := randColor()
-		triangle(&screen_coords[0], &screen_coords[1], &screen_coords[2], img, &fill, width, height)
+		v0 := worldCoords[2].subtract(&worldCoords[0])
+		v1 := worldCoords[1].subtract(&worldCoords[0])
+		n := cross(&v0, &v1)
+		n.normalizeL2()
+		I := dot(&n, &lightDir)
+		if I > 0 {
+			r, g, b := I * float64(fillColor.R), I * float64(fillColor.G), I * float64(fillColor.B)
+			fill := color.RGBA{uint8(r), uint8(g), uint8(b), fillColor.A}
+			triangle(&screenCoords[0], &screenCoords[1], &screenCoords[2], img, &fill, width, height)
+		}
 	}
 }
 
@@ -272,10 +308,11 @@ func main() {
 
 	fmt.Println("Number of faces: ", model.nFaces())
 	fmt.Println("Number of vertices: ", model.nVertices())
+	ratio := model.aspectRatio()
 
 	// Create canvas
-	width := 1000
 	height := 1000
+	width := int(ratio * float64(height))
 
 	upLeft := image.Point{0, 0}
 	lowRight := image.Point{width, height}
@@ -284,9 +321,9 @@ func main() {
 
 	// Render
 	//renderWireframe(&model, img, &color.RGBA{0, 0, 0, 255}, width, height)
-	renderTriangleMesh(&model, img, &color.RGBA{0, 0, 0, 0}, width, height)
+	renderTriangleMesh(&model, img, &color.RGBA{255, 255, 255, 255}, width, height)
 
 	// Save
-	f, _ := os.Create("./results/triangle_color.png")
+	f, _ := os.Create("./results/test.png")
 	png.Encode(f, imaging.FlipV(img))
 }
