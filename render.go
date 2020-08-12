@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"bufio"
 	"os"
+	"path/filepath"
 
 	// Strings 
 	"strings"
@@ -115,8 +116,8 @@ func (m *Model) setMinMax(x, y float64) {
 	m.max_y = math.Max(m.max_y, y)
 }
 
-func parseObj(file_path string) Model {
-	file, _ := os.Open("./bunny.obj")
+func parseObj(filePath string) Model {
+	file, _ := os.Open(filePath)
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
@@ -265,7 +266,9 @@ func renderTriangleMesh(model *Model, img *image.RGBA, color *color.RGBA, width 
 
 func main() {
 	// Parse .obj file
-	model := parseObj("./bunny.obj")
+	relPath := "./obj/bunny.obj"
+	absPath, _ := filepath.Abs(relPath)
+	model := parseObj(absPath)
 
 	fmt.Println("Number of faces: ", model.nFaces())
 	fmt.Println("Number of vertices: ", model.nVertices())
@@ -284,6 +287,6 @@ func main() {
 	renderTriangleMesh(&model, img, &color.RGBA{0, 0, 0, 0}, width, height)
 
 	// Save
-	f, _ := os.Create("triangle_color.png")
+	f, _ := os.Create("./results/triangle_color.png")
 	png.Encode(f, imaging.FlipV(img))
 }
