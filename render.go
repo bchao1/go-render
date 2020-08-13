@@ -432,7 +432,7 @@ func main() {
 	ratio := model.aspectRatio()
 
 	// Create canvas
-	height := 2000
+	height := 1000
 	width := int(ratio * float64(height))
 
 	upLeft := image.Point{0, 0}
@@ -452,6 +452,6 @@ func main() {
 	renderTriangleMesh(&model, img, &color.RGBA{255, 255, 255, 255}, &lightDir, width, height, 1.5)
 
 	// Save
-	f, _ := os.Create("./results/test.png")
+	f, _ := os.Create("./results/gouraud.png")
 	png.Encode(f, imaging.FlipV(img))
 }
