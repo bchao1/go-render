@@ -11,6 +11,7 @@ This is a toy project to learn Go and rendering at the same time.
 
 > Shading
 |Flat shading|Gouraud shading|Phong shading|
+|--|--|--|
 |![img](./results/triangle_zbuffer.png)|![img](./results/gouraud.png)|![img](./results/phong.png)|
 
 > Perspective
