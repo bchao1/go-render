@@ -93,16 +93,26 @@ func dot(v0, v1 *Vec3f) float64 {
 	return v0.x * v1.x + v0.y * v1.y + v0.z * v1.z
 }
 
-func (u *Vec3f) subtract(v *Vec3f){
-	u.x -= v.x
-	u.y -= v.y
-	u.z -= v.z
+func (u *Vec3f) subtract(v *Vec3f, inplace bool) Vec3f{
+	if inplace {
+		u.x -= v.x
+		u.y -= v.y
+		u.z -= v.z
+		return *u 
+	} else {
+		return newVec3f(u.x - v.x, u.y - v.y, u.z - v.z)
+	}
 }
 
-func (u *Vec3f) add(v *Vec3f){
-	u.x += v.x
-	u.y += v.y
-	u.z += v.z
+func (u *Vec3f) add(v *Vec3f, inplace bool) Vec3f{
+	if inplace {
+		u.x += v.x
+		u.y += v.y
+		u.z += v.z
+		return *u 
+	} else {
+		return newVec3f(u.x + v.x, u.y + v.y, u.z + v.z)
+	}
 }
 
 func (u *Vec3f) mul(m float64, inplace bool) Vec3f{
@@ -179,9 +189,9 @@ func (model *Model) computeFaceNormals() {
 			world_v := model.vertices[face[j]]
 			worldCoords[j] = world_v
 		}
-		worldCoords[2].subtract(&worldCoords[0])
-		worldCoords[1].subtract(&worldCoords[0])
-		n := cross(&worldCoords[2], &worldCoords[1])
+		v0 := worldCoords[2].subtract(&worldCoords[0], false)
+		v1 := worldCoords[1].subtract(&worldCoords[0], false)
+		n := cross(&v0, &v1)
 		n.normalizeL2()
 		model.faceNormals[i] = n
 	}
@@ -194,7 +204,7 @@ func (model *Model) computeVertexNormals() {
 		nfaces := len(model.vertexFaceNeighbors[i])
 		for j:=0; j<nfaces; j++ {
 			f := model.vertexFaceNeighbors[i][j]
-			n.add(&model.faceNormals[f])
+			n.add(&model.faceNormals[f], true)
 		}
 		n.div(float64(nfaces), true)
 		n.normalizeL2()
@@ -338,11 +348,11 @@ func triangle(v0 *Vec3f, v1 *Vec3f, v2 *Vec3f, vertexNormals *[]Vec3f, lightDir 
 				(*zbuffer)[int(P.x + P.y * float64(width))] = P.z
 				n := Vec3f{}
 				n1 := (*vertexNormals)[0].mul(v.x, false)
-				n.add(&n1)
+				n.add(&n1, true)
 				n2 := (*vertexNormals)[1].mul(v.y, false)
-				n.add(&n2)
+				n.add(&n2, true)
 				n3 := (*vertexNormals)[2].mul(v.z, false)
-				n.add(&n3)
+				n.add(&n3, true)
 				n.normalizeL2()
 				I := dot(&n, lightDir)
 				if I > 0 {
@@ -427,10 +437,10 @@ func main() {
 	// Render
 	//renderWireframe(&model, img, &color.RGBA{0, 0, 0, 255}, width, height, 2.0)
 	lightDir := newVec3f(0, 0, -1)
-	p := 1.5
+	p := 100.0
 	renderTriangleMesh(&model, img, &color.RGBA{255, 255, 255, 255}, &lightDir, width, height, 1.5, p)
 
 	// Save
-	f, _ := os.Create("./results/project_1.5.png")
+	f, _ := os.Create("./results/test.png")
 	png.Encode(f, imaging.FlipV(img))
 }
