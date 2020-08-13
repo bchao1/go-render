@@ -22,6 +22,7 @@ This is a toy project to learn Go and rendering at the same time.
 |--|--|--|--|
 |![img](results/project/project_5.0.png)|![img](results/project/project_2.0.png)|![img](results//project/project_1.5.png)|![img](results/project/project_1.0.png)|
 
-## TODO
-- Center align
-- Projections
+## `.obj` sources
+- https://www.prinmath.com/csci5229/OBJ/index.html
+- https://people.sc.fsu.edu/~jburkardt/data/obj/obj.html
+- https://groups.csail.mit.edu/graphics/classes/6.837/F03/models/

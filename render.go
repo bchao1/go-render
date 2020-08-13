@@ -321,7 +321,7 @@ func line(v0 *Vec3f, v1 *Vec3f, img *image.RGBA, color *color.RGBA) {
 	}
 }
 
-func triangle(v0 *Vec3f, v1 *Vec3f, v2 *Vec3f, vertexNormals *[]Vec3f, lightDir *Vec3f, img *image.RGBA, zbuffer *[]float64, fillColor *color.RGBA, width int, height int) {
+func triangle(v0 *Vec3f, v1 *Vec3f, v2 *Vec3f, vertexNormals *[]Vec3f, faceNormal *Vec3f, lightDir *Vec3f, img *image.RGBA, zbuffer *[]float64, fillColor *color.RGBA, width int, height int) {
 
 	pts := []*Vec3f{v0, v1, v2}
 
@@ -346,7 +346,8 @@ func triangle(v0 *Vec3f, v1 *Vec3f, v2 *Vec3f, vertexNormals *[]Vec3f, lightDir 
 			P.z = v.x * pts[0].z + v.y * pts[1].z + v.z * pts[2].z
 			if (*zbuffer)[int(P.x + P.y * float64(width))] < P.z {
 				(*zbuffer)[int(P.x + P.y * float64(width))] = P.z
-				I := gouraudShading(vertexNormals, lightDir, &v)
+				I := phongShading(vertexNormals, lightDir, &v)
+				// I := flatShading(faceNormal, lightDir)
 				if I > 0 {
 					fill := color.RGBA{uint8(float64(fillColor.R) * I),uint8(float64(fillColor.G) * I),uint8(float64(fillColor.B) * I), fillColor.A}
 					img.Set(int(P.x), int(P.y), fill)
@@ -385,13 +386,14 @@ func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, li
 		face := model.faces[i]
 		var screenCoords [3]Vec3f
 		var vertexNormals = make([]Vec3f, 3)
+		faceNormal := model.faceNormals[i]
 		for j:=0; j<3; j++ {
 			vs := face[j]
 			world_v := model.vertices[vs]
 			screenCoords[j] = worldToScreen(&world_v, model, width, height, scale)
 			vertexNormals[j] = model.vertexNormals[vs]
 		}
-		triangle(&screenCoords[0], &screenCoords[1], &screenCoords[2], &vertexNormals, lightDir, img, &zbuffer, fillColor, width, height)
+		triangle(&screenCoords[0], &screenCoords[1], &screenCoords[2], &vertexNormals, &faceNormal, lightDir, img, &zbuffer, fillColor, width, height)
 	}
 }
 
@@ -421,9 +423,19 @@ func phongShading(vertexNormals *[]Vec3f, lightDir *Vec3f, barycentric *Vec3f) f
 	return I
 }
 
+// 3. Flat Shading
+func flatShading(faceNormal *Vec3f, lightDir *Vec3f) float64 {
+	n := dot(faceNormal, lightDir)
+	return n
+}
+
 func main() {
 	// Parse .obj file
-	relPath := "./obj/bunny.obj"
+	if len(os.Args) == 1 {
+		fmt.Println("Specify input file!")
+		os.Exit(1)
+	}
+	relPath := os.Args[1]
 	absPath, _ := filepath.Abs(relPath)
 	model := parseObj(absPath)
 
@@ -432,7 +444,7 @@ func main() {
 	ratio := model.aspectRatio()
 
 	// Create canvas
-	height := 1000
+	height := 2000
 	width := int(ratio * float64(height))
 
 	upLeft := image.Point{0, 0}
@@ -452,6 +464,6 @@ func main() {
 	renderTriangleMesh(&model, img, &color.RGBA{255, 255, 255, 255}, &lightDir, width, height, 1.5)
 
 	// Save
-	f, _ := os.Create("./results/gouraud.png")
+	f, _ := os.Create("./results/test.png")
 	png.Encode(f, imaging.FlipV(img))
 }
