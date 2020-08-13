@@ -2,14 +2,16 @@
 
 This is a toy project to learn Go and rendering at the same time.
 
-> Basic rendering
+> Basics
 
 |||
 |--|--|
-|Wireframe|Random Color|
+|Wireframe|Triangle rasterization|
 |![img](./results/wireframe.png)|![img](./results/triangle_color.png)|
-|Triangle rasterization|Phong shading|
-|![img](./results/triangle_zbuffer.png)|![img](./results/phong.png)|
+
+> Shading
+|Flat shading|Gouraud shading|Phong shading|
+|![img](./results/triangle_zbuffer.png)|![img](./results/gouraud.png)|![img](./results/phong.png)|
 
 > Perspective
 

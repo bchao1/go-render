@@ -192,7 +192,7 @@ func (model *Model) computeFaceNormals() {
 		v0 := worldCoords[2].subtract(&worldCoords[0], false)
 		v1 := worldCoords[1].subtract(&worldCoords[0], false)
 		n := cross(&v0, &v1)
-		n.normalizeL2()
+		n.normalizeL2() // normalize!!
 		model.faceNormals[i] = n
 	}
 }
@@ -207,7 +207,7 @@ func (model *Model) computeVertexNormals() {
 			n.add(&model.faceNormals[f], true)
 		}
 		n.div(float64(nfaces), true)
-		n.normalizeL2()
+		n.normalizeL2() // normalize!!
 		model.vertexNormals[i] = n
 	}
 }
@@ -346,15 +346,7 @@ func triangle(v0 *Vec3f, v1 *Vec3f, v2 *Vec3f, vertexNormals *[]Vec3f, lightDir 
 			P.z = v.x * pts[0].z + v.y * pts[1].z + v.z * pts[2].z
 			if (*zbuffer)[int(P.x + P.y * float64(width))] < P.z {
 				(*zbuffer)[int(P.x + P.y * float64(width))] = P.z
-				n := Vec3f{}
-				n1 := (*vertexNormals)[0].mul(v.x, false)
-				n.add(&n1, true)
-				n2 := (*vertexNormals)[1].mul(v.y, false)
-				n.add(&n2, true)
-				n3 := (*vertexNormals)[2].mul(v.z, false)
-				n.add(&n3, true)
-				n.normalizeL2()
-				I := dot(&n, lightDir)
+				I := gouraudShading(vertexNormals, lightDir, &v)
 				if I > 0 {
 					fill := color.RGBA{uint8(float64(fillColor.R) * I),uint8(float64(fillColor.G) * I),uint8(float64(fillColor.B) * I), fillColor.A}
 					img.Set(int(P.x), int(P.y), fill)
@@ -380,7 +372,7 @@ func renderWireframe(model *Model, img *image.RGBA, color *color.RGBA, width int
 	}
 }
 
-func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, lightDir *Vec3f, width int, height int, scale float64, project float64) {
+func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, lightDir *Vec3f, width int, height int, scale float64) {
 	// fill
 	lightDir.normalizeL2()
 
@@ -388,12 +380,6 @@ func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, li
 	for i:=0; i<len(zbuffer); i++ {
 		zbuffer[i] = math.Inf(-1)
 	}
-
-	for i:=0; i<model.nVertices(); i++ {
-		model.vertices[i] = model.vertices[i].project(project)
-	}
-	model.computeFaceNormals()
-	model.computeVertexNormals()
 
 	for i:=0; i<model.nFaces(); i++ {
 		face := model.faces[i]
@@ -409,9 +395,35 @@ func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, li
 	}
 }
 
+// Shading 
+// 1. Gouraud Shading
+
+func gouraudShading(vertexNormals *[]Vec3f, lightDir *Vec3f, barycentric *Vec3f) float64{
+	I1 := dot(&(*vertexNormals)[0], lightDir)
+	I2 := dot(&(*vertexNormals)[1], lightDir)
+	I3 := dot(&(*vertexNormals)[2], lightDir)
+	I := I1 * barycentric.x + I2 * barycentric.y + I3 * barycentric.z 
+	return I
+}
+
+// 2. Phong Shading
+
+func phongShading(vertexNormals *[]Vec3f, lightDir *Vec3f, barycentric *Vec3f) float64{
+	n := Vec3f{}
+	n1 := (*vertexNormals)[0].mul(barycentric.x, false)
+	n.add(&n1, true)
+	n2 := (*vertexNormals)[1].mul(barycentric.y, false)
+	n.add(&n2, true)
+	n3 := (*vertexNormals)[2].mul(barycentric.z, false)
+	n.add(&n3, true)
+	n.normalizeL2()
+	I := dot(&n, lightDir)
+	return I
+}
+
 func main() {
 	// Parse .obj file
-	relPath := "./obj/african_head.obj"
+	relPath := "./obj/bunny.obj"
 	absPath, _ := filepath.Abs(relPath)
 	model := parseObj(absPath)
 
@@ -437,8 +449,7 @@ func main() {
 	// Render
 	//renderWireframe(&model, img, &color.RGBA{0, 0, 0, 255}, width, height, 2.0)
 	lightDir := newVec3f(0, 0, -1)
-	p := 100.0
-	renderTriangleMesh(&model, img, &color.RGBA{255, 255, 255, 255}, &lightDir, width, height, 1.5, p)
+	renderTriangleMesh(&model, img, &color.RGBA{255, 255, 255, 255}, &lightDir, width, height, 1.5)
 
 	// Save
 	f, _ := os.Create("./results/test.png")
