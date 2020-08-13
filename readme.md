@@ -22,6 +22,14 @@ This is a toy project to learn Go and rendering at the same time.
 |--|--|--|--|
 |![img](results/project/project_5.0.png)|![img](results/project/project_2.0.png)|![img](results//project/project_1.5.png)|![img](results/project/project_1.0.png)|
 
+> Textures
+
+Kudos to the author of [this article](https://blenderartists.org/t/uv-unwrapped-stanford-bunny-happy-spring-equinox/1101297) for providing custom Stanford bunny texture files.
+
+|Colored|Terracotta|
+|--|--|
+|![img](./results/textures/bunny_color.png)|![img](./results/textures/bunny_terracotta.png)|
+
 ## `.obj` sources
 - https://www.prinmath.com/csci5229/OBJ/index.html
 - https://people.sc.fsu.edu/~jburkardt/data/obj/obj.html

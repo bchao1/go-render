@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"bufio"
 	"os"
-	"path/filepath"
+	// "path/filepath"
 
 	// Strings 
 	"strings"
@@ -15,6 +15,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	_ "image/jpeg"
 	"github.com/disintegration/imaging"
 
 	// Math
@@ -169,6 +170,9 @@ type Model struct {
 	faceNormals []Vec3f
 	vertexNormals []Vec3f
 
+	textureCoordinates []Vec2f
+	faceTextures [][]int
+
 	min_x float64
 	min_y float64
 	max_x float64
@@ -226,6 +230,14 @@ func (m *Model) addFace(f *[]int){
 	m.faces = append(m.faces, *f)
 }
 
+func (m *Model) addTexture(t *Vec2f){
+	m.textureCoordinates = append(m.textureCoordinates, *t)
+}
+
+func (m *Model) addFaceTexture(ft *[]int) {
+	m.faceTextures = append(m.faceTextures, *ft)
+}
+
 func (m *Model) nFaces() int {
 	return len(m.faces)
 }
@@ -260,14 +272,26 @@ func parseObj(filePath string) Model {
 				model.vertexFaceNeighbors = append(model.vertexFaceNeighbors, make([]int, 0))
 			} else if tok[0] == "f" {
 				var vs []int
+				var vtextures []int
 				for i:=1; i<len(tok); i++ {
-					v, _ := strconv.Atoi(strings.Split(tok[i], "/")[0])
+					indices := strings.Split(tok[i], "/") // coordinate indices
+					v, _ := strconv.Atoi(indices[0])
+					vt, _ := strconv.Atoi(indices[1])
 					vs = append(vs, v - 1)
+					vtextures = append(vtextures, vt - 1)
 				}
 				model.addFace(&vs)
+				model.addFaceTexture(&vtextures)
+			} else if tok[0] == "vt" {
+				// Texture coordinates
+				x, _ := strconv.ParseFloat(tok[1], 64)
+				y, _ := strconv.ParseFloat(tok[2], 64)
+				tc := newVec2f(x, y) // texture coordinates
+				model.addTexture(&tc)
 			}
 		}
 	}
+	// Neighbor faces of vertices
 	for i:=0; i<model.nFaces(); i++ {
 		//fmt.Println(model.faces[i])
 		for j:=0; j<len(model.faces[i]); j++ {
@@ -275,8 +299,10 @@ func parseObj(filePath string) Model {
 			model.vertexFaceNeighbors[v] = append(model.vertexFaceNeighbors[v], i)
 		} 
 	}
+
 	model.computeFaceNormals()
 	model.computeVertexNormals()
+
 	return model
 }
 
@@ -321,8 +347,18 @@ func line(v0 *Vec3f, v1 *Vec3f, img *image.RGBA, color *color.RGBA) {
 	}
 }
 
-func triangle(v0 *Vec3f, v1 *Vec3f, v2 *Vec3f, vertexNormals *[]Vec3f, faceNormal *Vec3f, lightDir *Vec3f, img *image.RGBA, zbuffer *[]float64, fillColor *color.RGBA, width int, height int) {
+func triangle(
+	v0 *Vec3f, v1 *Vec3f, v2 *Vec3f,  // vertices
+	vertexNormals *[]Vec3f, vertexTextures *[]Vec2f, faceNormal *Vec3f, lightDir *Vec3f,  // vectors
+	img *image.RGBA, textureImage *image.Image, zbuffer *[]float64, 
+	fillColor *color.RGBA, width int, height int) {
 
+	//tw, th := getImageSize(textureImage)
+	//x := ((*vertexTextures)[0].x + (*vertexTextures)[1].x + (*vertexTextures)[2].x) / 3
+	//y := ((*vertexTextures)[0].y + (*vertexTextures)[1].y + (*vertexTextures)[2].y) / 3
+	//r, g, b := getPixelValue(textureImage, int(x * float64(tw)), int(y * float64(th)))
+	////fill := color.RGBA{uint8(I * float64(r)), uint8(I * float64(g)), uint8(I * float64(b)), 255}
+	
 	pts := []*Vec3f{v0, v1, v2}
 
 	bboxmin := newVec2f(math.Inf(1), math.Inf(1))
@@ -347,9 +383,11 @@ func triangle(v0 *Vec3f, v1 *Vec3f, v2 *Vec3f, vertexNormals *[]Vec3f, faceNorma
 			if (*zbuffer)[int(P.x + P.y * float64(width))] < P.z {
 				(*zbuffer)[int(P.x + P.y * float64(width))] = P.z
 				I := phongShading(vertexNormals, lightDir, &v)
-				// I := flatShading(faceNormal, lightDir)
+				fill := getColorFromTexture(textureImage, vertexTextures, &v, I)
+				//I := flatShading(faceNormal, lightDir)
 				if I > 0 {
-					fill := color.RGBA{uint8(float64(fillColor.R) * I),uint8(float64(fillColor.G) * I),uint8(float64(fillColor.B) * I), fillColor.A}
+					//fill := color.RGBA{uint8(float64(fillColor.R) * I),uint8(float64(fillColor.G) * I),uint8(float64(fillColor.B) * I), fillColor.A}
+					//fill := color.RGBA{uint8(float64(r) * I),uint8(float64(g) * I),uint8(float64(b) * I), 255}
 					img.Set(int(P.x), int(P.y), fill)
 				}
 			}
@@ -373,7 +411,7 @@ func renderWireframe(model *Model, img *image.RGBA, color *color.RGBA, width int
 	}
 }
 
-func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, lightDir *Vec3f, width int, height int, scale float64) {
+func renderTriangleMesh(model *Model, img *image.RGBA, textureImage *image.Image, fillColor *color.RGBA, lightDir *Vec3f, width int, height int, scale float64) {
 	// fill
 	lightDir.normalizeL2()
 
@@ -384,16 +422,23 @@ func renderTriangleMesh(model *Model, img *image.RGBA, fillColor *color.RGBA, li
 
 	for i:=0; i<model.nFaces(); i++ {
 		face := model.faces[i]
+		faceTexture := model.faceTextures[i]
+
 		var screenCoords [3]Vec3f
 		var vertexNormals = make([]Vec3f, 3)
+		var vertexTextures = make([]Vec2f, 3)
 		faceNormal := model.faceNormals[i]
 		for j:=0; j<3; j++ {
 			vs := face[j]
+			vts := faceTexture[j]
+
 			world_v := model.vertices[vs]
 			screenCoords[j] = worldToScreen(&world_v, model, width, height, scale)
 			vertexNormals[j] = model.vertexNormals[vs]
+			vertexTextures[j] = model.textureCoordinates[vts]
 		}
-		triangle(&screenCoords[0], &screenCoords[1], &screenCoords[2], &vertexNormals, &faceNormal, lightDir, img, &zbuffer, fillColor, width, height)
+		// render triangle
+		triangle(&screenCoords[0], &screenCoords[1], &screenCoords[2], &vertexNormals, &vertexTextures, &faceNormal, lightDir, img, textureImage, &zbuffer, fillColor, width, height)
 	}
 }
 
@@ -429,41 +474,67 @@ func flatShading(faceNormal *Vec3f, lightDir *Vec3f) float64 {
 	return n
 }
 
+// Utils
+func newImage(height int, aspectRatio float64) (*image.RGBA, int, int){
+	width := int(aspectRatio * float64(height))
+	upLeft := image.Point{0, 0}
+	lowRight := image.Point{width, height}
+	return image.NewRGBA(image.Rectangle{upLeft, lowRight}), width, height
+}
+
+// image utils
+func getPixelValue(img *image.Image, x int, y int) (int, int, int) {
+	r, g, b, _ := (*img).At(x, y).RGBA()
+	return int(r / 257), int(g / 257), int(b / 257)
+}
+
+func getColorFromTexture(img *image.Image, vertexTextures *[]Vec2f, barycentric *Vec3f, I float64) color.RGBA {
+	width, height := getImageSize(img)
+	x := (*vertexTextures)[0].x * barycentric.x + (*vertexTextures)[1].x * barycentric.y + (*vertexTextures)[2].x * barycentric.z 
+	y := (*vertexTextures)[0].y * barycentric.x + (*vertexTextures)[1].y * barycentric.y + (*vertexTextures)[2].y * barycentric.z 
+	r, g, b := getPixelValue(img, int(x * float64(width)), int(y * float64(height)))
+	return color.RGBA{uint8(I * float64(r)), uint8(I * float64(g)), uint8(I * float64(b)), 255}
+} 
+
+func getImageSize(img *image.Image)(int, int) {
+	// returns image width, height
+	bounds := (*img).Bounds()
+	return bounds.Max.X, bounds.Max.Y
+}
+
 func main() {
 	// Parse .obj file
 	if len(os.Args) == 1 {
 		fmt.Println("Specify input file!")
 		os.Exit(1)
 	}
-	relPath := os.Args[1]
-	absPath, _ := filepath.Abs(relPath)
-	model := parseObj(absPath)
 
+
+	objPath := os.Args[1]
+	model := parseObj(objPath)
+
+	var texturePath string
+	if len(os.Args) > 2 {
+		texturePath = os.Args[2]
+	}
+	fmt.Println(texturePath)
+	file, _ := os.Open(texturePath)
+	textureImage, _, _ := image.Decode(file)
+	
 	fmt.Println("Number of faces: ", model.nFaces())
 	fmt.Println("Number of vertices: ", model.nVertices())
+	fmt.Println("Number of textures coordinates: ", len(model.textureCoordinates))
+	fmt.Println("Number of face textures: ", len(model.faceTextures))
+	
 	ratio := model.aspectRatio()
-
-	// Create canvas
-	height := 2000
-	width := int(ratio * float64(height))
-
-	upLeft := image.Point{0, 0}
-	lowRight := image.Point{width, height}
-
-	// Initialize image and fill with black
-	img := image.NewRGBA(image.Rectangle{upLeft, lowRight})
-	//for i:=0;i<width;i++{
-	//	for j:=0;j<height;j++{
-	//		img.Set(i, j, color.Black)
-	//	}
-	//}
+	img, width, height := newImage(1000, ratio)
 
 	// Render
 	//renderWireframe(&model, img, &color.RGBA{0, 0, 0, 255}, width, height, 2.0)
 	lightDir := newVec3f(0, 0, -1)
-	renderTriangleMesh(&model, img, &color.RGBA{255, 255, 255, 255}, &lightDir, width, height, 1.5)
+	renderTriangleMesh(&model, img, &textureImage, &color.RGBA{255, 255, 255, 255}, &lightDir, width, height, 1.5)
 
 	// Save
-	f, _ := os.Create("./results/test.png")
+	f, _ := os.Create("./results/textures/bunny_terracotta.png")
 	png.Encode(f, imaging.FlipV(img))
 }
