@@ -268,12 +268,26 @@ func (m *Model) setMinMax(x, y float64) {
 	m.max_y = math.Max(m.max_y, y)
 }
 
-func (m *Model) transformCoordinates() {
+func (m *Model) transformCoordinates(eye *Vec3f, center *Vec3f, up *Vec3f) {
 	// transform world vertices (projection, rotation, etc)
-	c := 0.5
+	
+	// Compute camera scene basis
+	b3 := eye.subtract(center, false)
+	b3.normalizeL2()
+	b1 := cross(up, &b3)
+	b1.normalizeL2()
+	b2 := cross(&b3, &b1)
+	b2.normalizeL2()
+
+	//c := 0.5
 	for i:=0; i<m.nVertices(); i++ {
-		z := m.vertices[i].z
-		m.vertices[i].div(1 - z / c, true) 
+		// z := m.vertices[i].z
+		//m.vertices[i].div(1 - z / c, true) 
+		v := &m.vertices[i]
+		x := v.x * b1.x + v.y * b2.x + v.z * b3.x
+		y := v.x * b1.y + v.y * b2.y + v.z * b3.y
+		z := v.x * b1.z + v.y * b2.z + v.z * b3.z
+		v.x, v.y, v.z = x, y, z
 		m.setMinMax(m.vertices[i].x, m.vertices[i].y)
 	}
 	return
@@ -405,12 +419,16 @@ func triangle(
 			if (*zbuffer)[int(P.x + P.y * float64(width))] < P.z {
 				(*zbuffer)[int(P.x + P.y * float64(width))] = P.z
 				I := phongShading(vertexNormals, lightDir, &v)
-				//fill := getColorFromTexture(textureImage, vertexTextures, &v, I)
-				//I := flatShading(faceNormal, lightDir)
-				if I > 0 {
-					//fill := color.RGBA{uint8(float64(fillColor.R) * I),uint8(float64(fillColor.G) * I),uint8(float64(fillColor.B) * I), fillColor.A}
+
+				var fill color.RGBA
+				if textureImage == nil {
+					// default color white
 					r, g, b := fillColor.R, fillColor.G, fillColor.B
-					fill := color.RGBA{uint8(float64(r) * I),uint8(float64(g) * I),uint8(float64(b) * I), 255}
+					fill = color.RGBA{uint8(float64(r) * I),uint8(float64(g) * I),uint8(float64(b) * I), 255}
+				} else {
+					fill = getColorFromTexture(textureImage, vertexTextures, &v, I)
+				}
+				if I > 0 {
 					img.Set(int(P.x), int(P.y), fill)
 				}
 			}
@@ -434,7 +452,10 @@ func renderWireframe(model *Model, img *image.RGBA, color *color.RGBA, width int
 	}
 }
 
-func renderTriangleMesh(model *Model, img *image.RGBA, textureImage *image.Image, fillColor *color.RGBA, lightDir *Vec3f, width int, height int, scale float64) {
+func renderTriangleMesh(
+	model *Model, img *image.RGBA, textureImage *image.Image, 
+	fillColor *color.RGBA, lightDir *Vec3f, eye *Vec3f, center *Vec3f, up *Vec3f,
+	width int, height int, scale float64) {
 	// fill
 	lightDir.normalizeL2()
 
@@ -446,7 +467,7 @@ func renderTriangleMesh(model *Model, img *image.RGBA, textureImage *image.Image
 	// Transform coordinates
 	model.centerAlignShift() // center cooridnates so they are zero-centered
 	// Now camera is centered
-	model.transformCoordinates() // Do projections and other transformations, update coordinates
+	model.transformCoordinates(eye, center, up) // Do projections and other transformations, update coordinates
 
 	// Compute normals
 	model.computeFaceNormals()
@@ -547,18 +568,24 @@ func main() {
 		os.Exit(1)
 	}
 
-
 	objPath := os.Args[1]
+	fmt.Println("Using .obj file: ", objPath)
 	model := parseObj(objPath)
 
 	var texturePath string
 	if len(os.Args) > 2 {
 		texturePath = os.Args[2]
+		fmt.Println("Using texture file: ", texturePath)
+	} else {
+		fmt.Println("No texture file specified. Using default color (white).")
 	}
-	fmt.Println(texturePath)
+
 	file, _ := os.Open(texturePath)
+	if file == nil {
+		fmt.Println("Texture file does not exist. Using default color (white).")
+	}
 	textureImage, _, _ := image.Decode(file)
-	
+
 	fmt.Println("Number of faces: ", model.nFaces())
 	fmt.Println("Number of vertices: ", model.nVertices())
 	fmt.Println("Number of textures coordinates: ", len(model.textureCoordinates))
@@ -570,9 +597,19 @@ func main() {
 	// Render
 	//renderWireframe(&model, img, &color.RGBA{0, 0, 0, 255}, width, height, 2.0)
 	lightDir := newVec3f(0, 0, -1)
-	renderTriangleMesh(
-		&model, img, &textureImage, &color.RGBA{255, 255, 255, 255}, 
-		&lightDir, width, height, 1.5)
+	eye := newVec3f(0, -1, 1)
+	center := newVec3f(0, 0, 0)
+	up := newVec3f(0, 1, 0)
+
+	if textureImage == nil {
+		renderTriangleMesh(
+			&model, img, nil, &color.RGBA{255, 255, 255, 255}, 
+			&lightDir, &eye, &center, &up, width, height, 1.5)
+	} else {
+		renderTriangleMesh(
+			&model, img, &textureImage, nil, 
+			&lightDir, &eye, &center, &up, width, height, 1.5)
+	}
 
 	// Save
 	f, _ := os.Create("./results/test.png")
