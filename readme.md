@@ -43,6 +43,13 @@ Kudos to the author of [this article](https://blenderartists.org/t/uv-unwrapped-
 |![img](./results/camera/1.png)|![img](./results/camera/2.png)|![img](./results/camera/3.png)|![img](./results/camera/4.png)|
 |![img](./results/camera/8.png)|![img](./results/camera/7.png)|![img](./results/camera/6.png)|![img](./results/camera/5.png)|
 
+> Light
+
+|||||
+|--|--|--|--|
+|![img](./results/light/-10.png)|![img](./results/light/-5.png)|![img](./results/light/-2.png)|![img](./results/light/-1.png)|
+![img](./results/light/10.png)|![img](./results/light/5.png)|![img](./results/light/2.png)|![img](./results/light/1.png)|
+
 ## `.obj` sources
 - https://www.prinmath.com/csci5229/OBJ/index.html
 - https://people.sc.fsu.edu/~jburkardt/data/obj/obj.html
