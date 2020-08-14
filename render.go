@@ -211,6 +211,7 @@ func (model *Model) computeFaceNormals() {
 		v0 := worldCoords[2].subtract(&worldCoords[0], false)
 		v1 := worldCoords[1].subtract(&worldCoords[0], false)
 		n := cross(&v0, &v1)
+		//n.div(n.z, true)
 		n.normalizeL2() // normalize!!
 		model.faceNormals[i] = n
 	}
@@ -418,8 +419,7 @@ func triangle(
 			P.z = v.x * pts[0].z + v.y * pts[1].z + v.z * pts[2].z
 			if (*zbuffer)[int(P.x + P.y * float64(width))] < P.z {
 				(*zbuffer)[int(P.x + P.y * float64(width))] = P.z
-				I := phongShading(vertexNormals, lightDir, &v)
-
+				I := math.Max(0.0, phongShading(vertexNormals, lightDir, &v))
 				var fill color.RGBA
 				if textureImage == nil {
 					// default color white
@@ -428,9 +428,7 @@ func triangle(
 				} else {
 					fill = getColorFromTexture(textureImage, vertexTextures, &v, I)
 				}
-				if I > 0 {
-					img.Set(int(P.x), int(P.y), fill)
-				}
+				img.Set(int(P.x), int(P.y), fill)
 			}
 		}
 	}
@@ -592,11 +590,13 @@ func main() {
 	fmt.Println("Number of face textures: ", len(model.faceTextures))
 	
 	ratio := model.aspectRatio()
-	img, width, height := newImage(1000, ratio, false)
+	img, width, height := newImage(1000, ratio, true)
 
 	// Render
 	//renderWireframe(&model, img, &color.RGBA{0, 0, 0, 255}, width, height, 2.0)
-	lightDir := newVec3f(0, 0, -1)
+
+	x := 9
+	lightDir := newVec3f(float64(x), 0, -1)
 	eye := newVec3f(-1, 0, 1)
 	center := newVec3f(0, 0, 0)
 	up := newVec3f(0, 1, 0)
@@ -612,6 +612,6 @@ func main() {
 	}
 
 	// Save
-	f, _ := os.Create("./results/camera/8.png")
+	f, _ := os.Create(fmt.Sprintf("./results/light/%d.png", x))
 	png.Encode(f, imaging.FlipV(img))
 }

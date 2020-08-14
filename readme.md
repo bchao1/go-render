@@ -2,6 +2,12 @@
 
 This is a toy project to learn Go and rendering at the same time.
 
+<p align="center">
+    <img src="./results/light/light.gif">
+</p>
+
+## Demo 
+
 > Basics
 
 |||
