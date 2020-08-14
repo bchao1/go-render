@@ -593,28 +593,48 @@ func main() {
 	fmt.Println("Number of face textures: ", len(model.faceTextures))
 	
 	ratio := model.aspectRatio()
-	img, width, height := newImage(1000, ratio, true)
 
-	// Render
-	//renderWireframe(&model, img, &color.RGBA{0, 0, 0, 255}, width, height, 2.0)
+	lightDirs := []Vec3f{
+		newVec3f(1, 0, 0), 
+		newVec3f(1, -0.5, 0),
+		newVec3f(1, -1, 0),
+		newVec3f(1, -1.5, 0),
+		newVec3f(0, -1, 0),
+		newVec3f(-1, -1.5, 0),
+		newVec3f(-1, -1, 0),
+		newVec3f(-1, -0.5, 0),
+		newVec3f(-1, 0, 0),
+		newVec3f(-1, 0, -0.5),
+		newVec3f(-1, 0, -1),
+		newVec3f(-1, 0, -1.5),
+		newVec3f(0, 0, -1),
+		newVec3f(1, 0, -1.5),
+		newVec3f(1, 0, -1),
+		newVec3f(1, 0, -0.5),
+		newVec3f(1, 0, 0),
+	}
 
-	x := 9
-	lightDir := newVec3f(float64(x), 0, -1)
-	eye := newVec3f(-1, 0, 1)
+	eye := newVec3f(0, 0, 1)
 	center := newVec3f(0, 0, 0)
 	up := newVec3f(0, 1, 0)
 
-	if textureImage == nil {
-		renderTriangleMesh(
-			&model, img, nil, &color.RGBA{255, 255, 255, 255}, 
-			&lightDir, &eye, &center, &up, width, height, 1.5)
-	} else {
-		renderTriangleMesh(
-			&model, img, &textureImage, nil, 
-			&lightDir, &eye, &center, &up, width, height, 1.5)
-	}
+	for i:=0; i<len(lightDirs); i++ {
 
-	// Save
-	f, _ := os.Create(fmt.Sprintf("./results/light/%d.png", x))
-	png.Encode(f, imaging.FlipV(img))
+		img, width, height := newImage(1000, ratio, true)
+		lightDir := lightDirs[i]//newVec3f(0, -1, 0)
+
+		if textureImage == nil {
+			renderTriangleMesh(
+				&model, img, nil, &color.RGBA{255, 255, 255, 255}, 
+				&lightDir, &eye, &center, &up, width, height, 1.5)
+		} else {
+			renderTriangleMesh(
+				&model, img, &textureImage, nil, 
+				&lightDir, &eye, &center, &up, width, height, 1.5)
+		}
+
+		// Save
+		f, _ := os.Create(fmt.Sprintf("./results/light2/%d.png", i))
+		png.Encode(f, imaging.FlipV(img))
+	}
 }
