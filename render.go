@@ -442,6 +442,9 @@ func renderWireframe(model *Model, img *image.RGBA, color *color.RGBA, width int
 			world_v0 := model.vertices[face[j]]
 			world_v1 := model.vertices[face[(j+1)%len(face)]]
 
+			world_v0 = world_v0.normalizeCenteredCube(model)
+			world_v1 = world_v1.normalizeCenteredCube(model)
+
 			screen_v0 := worldToScreen(&world_v0, model, width, height, scale)
 			screen_v1 := worldToScreen(&world_v1, model, width, height, scale)
 			
