@@ -30,6 +30,13 @@ Kudos to the author of [this article](https://blenderartists.org/t/uv-unwrapped-
 |--|--|
 |![img](./results/textures/bunny_color.png)|![img](./results/textures/bunny_terracotta.png)|
 
+> Camera
+
+|||||
+|--|--|--|--|
+|![img](./results/camera/1.png)|![img](./results/camera/2.png)|![img](./results/camera/3.png)|![img](./results/camera/4.png)|
+|![img](./results/camera/8.png)|![img](./results/camera/7.png)|![img](./results/camera/6.png)|![img](./results/camera/5.png)|
+
 ## `.obj` sources
 - https://www.prinmath.com/csci5229/OBJ/index.html
 - https://people.sc.fsu.edu/~jburkardt/data/obj/obj.html

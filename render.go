@@ -592,12 +592,12 @@ func main() {
 	fmt.Println("Number of face textures: ", len(model.faceTextures))
 	
 	ratio := model.aspectRatio()
-	img, width, height := newImage(1000, ratio, true)
+	img, width, height := newImage(1000, ratio, false)
 
 	// Render
 	//renderWireframe(&model, img, &color.RGBA{0, 0, 0, 255}, width, height, 2.0)
 	lightDir := newVec3f(0, 0, -1)
-	eye := newVec3f(0, -1, 1)
+	eye := newVec3f(-1, 0, 1)
 	center := newVec3f(0, 0, 0)
 	up := newVec3f(0, 1, 0)
 
@@ -612,6 +612,6 @@ func main() {
 	}
 
 	// Save
-	f, _ := os.Create("./results/test.png")
+	f, _ := os.Create("./results/camera/8.png")
 	png.Encode(f, imaging.FlipV(img))
 }
