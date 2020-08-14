@@ -16,6 +16,7 @@ import (
 	"image/color"
 	"image/png"
 	_ "image/jpeg"
+	"image/draw"
 	"github.com/disintegration/imaging"
 
 	// Math
@@ -34,7 +35,7 @@ func randColor() color.RGBA {
 }
 
 func worldToScreen(v *Vec3f, model *Model, width int, height int, scale float64) Vec3f {
-	x, y := v.normalizeMinMax2D(model)  // normalize w.r.t min, max boundaries
+	x, y := v.x, v.y
 	// Center align
 	x = float64(width) * ((x - 0.5) / scale + 0.5)
 	y = float64(height) * ((y - 0.5) / scale + 0.5)
@@ -147,10 +148,17 @@ func newVec3f(x, y, z float64) Vec3f {
 	return v
 }
 
-func (v *Vec3f) normalizeMinMax2D(m *Model) (float64, float64){
-	x := (v.x - m.min_x) / (m.max_x - m.min_x)
-	y := (v.y - m.min_y) / (m.max_y - m.min_y)
-	return x, y
+func (m *Model) centerAlignShift() {
+	// Shift amount to center align
+	dx, dy := -(m.max_x + m.min_x) / 2, -(m.max_y + m.min_y) / 2
+	for i:=0; i<m.nVertices(); i++ {
+		m.vertices[i].x += dx 
+		m.vertices[i].y += dy
+	}
+	m.min_x += dx
+	m.max_x += dx 
+	m.min_y += dy 
+	m.max_y += dy
 }
 
 func (v *Vec3f) normalizeL2() {
@@ -160,11 +168,18 @@ func (v *Vec3f) normalizeL2() {
 	v.z /= norm
 }
 
+func (v *Vec3f) normalizeCenteredCube(m *Model) Vec3f{
+	// Normalize to [0, 1]
+	x := (v.x - m.min_x) / (m.max_x - m.min_x)
+	y := (v.y - m.min_y) / (m.max_y - m.min_y)
+	return newVec3f(x, y, v.z)
+}
+
 // Model
 type Model struct {
 	vertices []Vec3f
 	faces [][]int
-	
+
 	vertexFaceNeighbors [][]int
 
 	faceNormals []Vec3f
@@ -253,6 +268,17 @@ func (m *Model) setMinMax(x, y float64) {
 	m.max_y = math.Max(m.max_y, y)
 }
 
+func (m *Model) transformCoordinates() {
+	// transform world vertices (projection, rotation, etc)
+	c := 0.5
+	for i:=0; i<m.nVertices(); i++ {
+		z := m.vertices[i].z
+		m.vertices[i].div(1 - z / c, true) 
+		m.setMinMax(m.vertices[i].x, m.vertices[i].y)
+	}
+	return
+}
+
 func parseObj(filePath string) Model {
 	file, _ := os.Open(filePath)
 	defer file.Close()
@@ -299,10 +325,6 @@ func parseObj(filePath string) Model {
 			model.vertexFaceNeighbors[v] = append(model.vertexFaceNeighbors[v], i)
 		} 
 	}
-
-	model.computeFaceNormals()
-	model.computeVertexNormals()
-
 	return model
 }
 
@@ -383,11 +405,12 @@ func triangle(
 			if (*zbuffer)[int(P.x + P.y * float64(width))] < P.z {
 				(*zbuffer)[int(P.x + P.y * float64(width))] = P.z
 				I := phongShading(vertexNormals, lightDir, &v)
-				fill := getColorFromTexture(textureImage, vertexTextures, &v, I)
+				//fill := getColorFromTexture(textureImage, vertexTextures, &v, I)
 				//I := flatShading(faceNormal, lightDir)
 				if I > 0 {
 					//fill := color.RGBA{uint8(float64(fillColor.R) * I),uint8(float64(fillColor.G) * I),uint8(float64(fillColor.B) * I), fillColor.A}
-					//fill := color.RGBA{uint8(float64(r) * I),uint8(float64(g) * I),uint8(float64(b) * I), 255}
+					r, g, b := fillColor.R, fillColor.G, fillColor.B
+					fill := color.RGBA{uint8(float64(r) * I),uint8(float64(g) * I),uint8(float64(b) * I), 255}
 					img.Set(int(P.x), int(P.y), fill)
 				}
 			}
@@ -420,6 +443,15 @@ func renderTriangleMesh(model *Model, img *image.RGBA, textureImage *image.Image
 		zbuffer[i] = math.Inf(-1)
 	}
 
+	// Transform coordinates
+	model.centerAlignShift() // center cooridnates so they are zero-centered
+	// Now camera is centered
+	model.transformCoordinates() // Do projections and other transformations, update coordinates
+
+	// Compute normals
+	model.computeFaceNormals()
+	model.computeVertexNormals()
+
 	for i:=0; i<model.nFaces(); i++ {
 		face := model.faces[i]
 		faceTexture := model.faceTextures[i]
@@ -433,7 +465,8 @@ func renderTriangleMesh(model *Model, img *image.RGBA, textureImage *image.Image
 			vts := faceTexture[j]
 
 			world_v := model.vertices[vs]
-			screenCoords[j] = worldToScreen(&world_v, model, width, height, scale)
+			world_v = world_v.normalizeCenteredCube(model) // Normalize coordinates to [0, 1] cube by min/max value
+			screenCoords[j] = worldToScreen(&world_v, model, width, height, scale) // project to screen
 			vertexNormals[j] = model.vertexNormals[vs]
 			vertexTextures[j] = model.textureCoordinates[vts]
 		}
@@ -475,11 +508,16 @@ func flatShading(faceNormal *Vec3f, lightDir *Vec3f) float64 {
 }
 
 // Utils
-func newImage(height int, aspectRatio float64) (*image.RGBA, int, int){
+func newImage(height int, aspectRatio float64, fill bool) (*image.RGBA, int, int){
 	width := int(aspectRatio * float64(height))
 	upLeft := image.Point{0, 0}
 	lowRight := image.Point{width, height}
-	return image.NewRGBA(image.Rectangle{upLeft, lowRight}), width, height
+	img :=image.NewRGBA(image.Rectangle{upLeft, lowRight})
+	if fill {
+		background := color.RGBA{0, 0, 0, 255}
+		draw.Draw(img, img.Bounds(), &image.Uniform{background}, image.ZP, draw.Src)
+	}
+	return img, width, height
 }
 
 // image utils
@@ -527,14 +565,16 @@ func main() {
 	fmt.Println("Number of face textures: ", len(model.faceTextures))
 	
 	ratio := model.aspectRatio()
-	img, width, height := newImage(1000, ratio)
+	img, width, height := newImage(1000, ratio, true)
 
 	// Render
 	//renderWireframe(&model, img, &color.RGBA{0, 0, 0, 255}, width, height, 2.0)
 	lightDir := newVec3f(0, 0, -1)
-	renderTriangleMesh(&model, img, &textureImage, &color.RGBA{255, 255, 255, 255}, &lightDir, width, height, 1.5)
+	renderTriangleMesh(
+		&model, img, &textureImage, &color.RGBA{255, 255, 255, 255}, 
+		&lightDir, width, height, 1.5)
 
 	// Save
-	f, _ := os.Create("./results/textures/bunny_terracotta.png")
+	f, _ := os.Create("./results/test.png")
 	png.Encode(f, imaging.FlipV(img))
 }
