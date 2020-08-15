@@ -160,7 +160,8 @@ func (m *Model) centerAlignShift() {
 	m.min_y += dy 
 	m.max_y += dy
 
-	m.origVertices = append([]Vec3f{}, m.vertices...) // temp
+	m.origVertices = append([]Vec3f{}, m.vertices...)
+
 }
 
 func (v *Vec3f) normalizeL2() {
@@ -199,7 +200,7 @@ type Model struct {
 }
 
 func newModel() Model{
-	m := Model{min_x: math.Inf(1), min_y: math.Inf(1), max_x: math.Inf(-1), max_y: math.Inf(-1)}
+	m := Model{min_x: 1e10, min_y: 1e10, max_x: -1e10, max_y: -1e10}
 	return m
 }
 
@@ -276,6 +277,8 @@ func (m *Model) setMinMax(x, y float64) {
 func (m *Model) transformCoordinates(eye *Vec3f, center *Vec3f, up *Vec3f) {
 	// transform world vertices (projection, rotation, etc)
 	
+	m.vertices = append([]Vec3f{}, m.origVertices...) // reset to world coordinates
+
 	// Compute camera scene basis
 	b3 := eye.subtract(center, false)
 	b3.normalizeL2()
@@ -293,14 +296,8 @@ func (m *Model) transformCoordinates(eye *Vec3f, center *Vec3f, up *Vec3f) {
 		y := v.x * b1.y + v.y * b2.y + v.z * b3.y
 		z := v.x * b1.z + v.y * b2.z + v.z * b3.z
 		v.x, v.y, v.z = x, y, z
-		m.setMinMax(m.vertices[i].x, m.vertices[i].y)
 	}
 	return
-}
-
-func (m *Model) reset() {
-	m.min_x, m.min_y, m.max_x, m.max_y = math.Inf(1), math.Inf(1), math.Inf(-1), math.Inf(-1)
-	m.vertices = append([]Vec3f{}, m.origVertices...)
 }
 
 func parseObj(filePath string) Model {
@@ -349,7 +346,7 @@ func parseObj(filePath string) Model {
 			model.vertexFaceNeighbors[v] = append(model.vertexFaceNeighbors[v], i)
 		} 
 	}
-	
+
 	model.centerAlignShift()
 
 	return model
@@ -477,9 +474,7 @@ func renderTriangleMesh(
 		zbuffer[i] = math.Inf(-1)
 	}
 
-	model.reset()
-	fmt.Println(model.vertices[0])
-	// Now camera is centered
+	// Transform coordinates
 	model.transformCoordinates(eye, center, up) // Do projections and other transformations, update coordinates
 
 	// Compute normals
@@ -627,18 +622,19 @@ func main() {
 	//}
 
 	// default
-	eye := newVec3f(1, 0, 0)
+	eye := newVec3f(0, 0, 1)
 	center := newVec3f(0, 0, 0)
 	up := newVec3f(0, 1, 0)
-	lightDir := newVec3f(0, 0, -1)
+	lightDir := newVec3f(0, -1, -1)
 
-	n := 1
-	for i:=0; i<n; i++{
+	
+	n := 40
+
+	for i:=0; i<n; i++ {
 		fmt.Println("Rendering ", i)
-		// rad := 2 * math.Pi * float64(i) / float64(n)
-		//eye = newVec3f(math.Sin(rad), 0, math.Cos(rad))
-		fmt.Println(eye)
-
+		
+		rad := 2 * math.Pi * float64(i) / float64(n)
+		eye = newVec3f(math.Sin(rad), 0, math.Cos(rad))
 		img, width, height := newImage(1000, ratio, true)
 		
 		if textureImage == nil {
@@ -651,7 +647,7 @@ func main() {
 				&lightDir, &eye, &center, &up, width, height, 1.5)
 		}
 		// Save
-		f, _ := os.Create(fmt.Sprintf("./results/test.png"))
+		f, _ := os.Create(fmt.Sprintf("./results/camera2/%d.png", i))
 		png.Encode(f, imaging.FlipV(img))
 	}
-}
+}	
