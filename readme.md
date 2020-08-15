@@ -8,6 +8,24 @@ This is a toy project to learn Go and rendering at the same time.
 </p>
 
 The OG [tinyrenderer](https://github.com/ssloy/tinyrenderer) project helped me alot. It's some great stuff, and I highly recommend everyone check it out.
+<br>
+The code is pretty self-contained. I only used a 3rd-party library `imaging` to flip images vertically. 
+
+## Usage
+```
+go run render.go <path to .obj file> <path to texture file>
+```
+For example, in `run.sh`,
+```
+go run data/obj/bunny_2.obj data/textures/bunny_texture.jpg
+```
+
+Of course, you can first build the `render.go`
+```
+go build render.go
+./render <path to .obj file> <path to texture file>
+```
+You could also play with some other parameters (light direction, camera position), spectral lighting, etc in `render.go`.
 
 ## Demo 
 
