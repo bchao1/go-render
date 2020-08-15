@@ -428,13 +428,14 @@ func triangle(
 			P.z = v.x * pts[0].z + v.y * pts[1].z + v.z * pts[2].z
 			if (*zbuffer)[int(P.x + P.y * float64(width))] < P.z {
 				(*zbuffer)[int(P.x + P.y * float64(width))] = P.z
-				I := math.Max(0.0, phongShading(vertexNormals, lightDir, &v))
+				diff, spec := phongShading(vertexNormals, lightDir, &v)
+				diff = math.Max(0.0, diff)
+				spec = math.Max(0.0, spec)
 				var fill color.RGBA
 				if textureImage == nil {
-					r, g, b := fillColor.R, fillColor.G, fillColor.B
-					fill = color.RGBA{uint8(float64(r) * I),uint8(float64(g) * I),uint8(float64(b) * I), 255}
+					fill = getColor(*fillColor, diff, spec)
 				} else {
-					fill = getColorFromTexture(textureImage, vertexTextures, &v, I)
+					fill = getColorFromTexture(textureImage, vertexTextures, &v, diff, spec)
 				}
 				img.Set(int(P.x), int(P.y), fill)
 			}
@@ -516,7 +517,9 @@ func gouraudShading(vertexNormals *[]Vec3f, lightDir *Vec3f, barycentric *Vec3f)
 
 // 2. Phong Shading
 
-func phongShading(vertexNormals *[]Vec3f, lightDir *Vec3f, barycentric *Vec3f) float64{
+func phongShading(vertexNormals *[]Vec3f, lightDir *Vec3f, barycentric *Vec3f) (float64, float64){
+	// Compute diffuse and spectral lighting
+
 	n := Vec3f{}
 	n1 := (*vertexNormals)[0].mul(barycentric.x, false)
 	n.add(&n1, true)
@@ -525,8 +528,16 @@ func phongShading(vertexNormals *[]Vec3f, lightDir *Vec3f, barycentric *Vec3f) f
 	n3 := (*vertexNormals)[2].mul(barycentric.z, false)
 	n.add(&n3, true)
 	n.normalizeL2()
-	I := dot(&n, lightDir)
-	return I
+	
+	diff := math.Max(0.0, dot(&n, lightDir)) // diffuse intensity
+
+	// Reflected light
+	r := n.mul(2 * dot(&n, lightDir), false)
+	r.subtract(lightDir, true)
+
+	spec := math.Pow(math.Max(0.0, -r.z), 10)
+
+	return diff, spec
 }
 
 // 3. Flat Shading
@@ -549,18 +560,30 @@ func newImage(height int, aspectRatio float64, fill bool) (*image.RGBA, int, int
 }
 
 // image utils
-func getPixelValue(img *image.Image, x int, y int) (int, int, int) {
+func getPixelValue(img *image.Image, x int, y int) (uint8, uint8, uint8) {
 	r, g, b, _ := (*img).At(x, y).RGBA()
-	return int(r / 257), int(g / 257), int(b / 257)
+	return uint8(r / 257), uint8(g / 257), uint8(b / 257)
 }
 
-func getColorFromTexture(img *image.Image, vertexTextures *[]Vec2f, barycentric *Vec3f, I float64) color.RGBA {
+func getColorFromTexture(img *image.Image, vertexTextures *[]Vec2f, barycentric *Vec3f, diff float64, spec float64) color.RGBA {
 	width, height := getImageSize(img)
 	x := (*vertexTextures)[0].x * barycentric.x + (*vertexTextures)[1].x * barycentric.y + (*vertexTextures)[2].x * barycentric.z 
 	y := (*vertexTextures)[0].y * barycentric.x + (*vertexTextures)[1].y * barycentric.y + (*vertexTextures)[2].y * barycentric.z 
 	r, g, b := getPixelValue(img, int(x * float64(width)), int(y * float64(height)))
-	return color.RGBA{uint8(I * float64(r)), uint8(I * float64(g)), uint8(I * float64(b)), 255}
+	return getColor(color.RGBA{r, g, b, 255}, diff, spec)
 } 
+
+func getColor(fillColor color.RGBA, diff float64, spec float64) color.RGBA {
+	r, g, b := fillColor.R, fillColor.G, fillColor.B
+	
+	coeff := diff + 0.8 * spec
+
+	r = uint8(math.Min(5 + float64(r) * coeff, 255))
+	g = uint8(math.Min(5 + float64(g) * coeff, 255))
+	b = uint8(math.Min(5 + float64(b) * coeff, 255))
+
+	return color.RGBA{r, g, b, 255}
+}
 
 func getImageSize(img *image.Image)(int, int) {
 	// returns image width, height
@@ -584,12 +607,12 @@ func main() {
 		texturePath = os.Args[2]
 		fmt.Println("Using texture file: ", texturePath)
 	} else {
-		fmt.Println("No texture file specified. Using default color (white).")
+		fmt.Println("No texture file specified. Using default color.")
 	}
 
 	file, _ := os.Open(texturePath)
 	if file == nil {
-		fmt.Println("Texture file does not exist. Using default color (white).")
+		fmt.Println("Texture file does not exist. Using default color.")
 	}
 	textureImage, _, _ := image.Decode(file)
 
@@ -624,13 +647,13 @@ func main() {
 	eye := newVec3f(0, 0, 1)
 	center := newVec3f(0, 0, 0)
 	up := newVec3f(0, 1, 0)
-	lightDir := newVec3f(0, -5, -1)
+	lightDir := newVec3f(0, -1, 1)
 
 	img, width, height := newImage(1000, ratio, true)
 	
 	if textureImage == nil {
 		renderTriangleMesh(
-			&model, img, nil, &color.RGBA{255, 255, 204, 255}, 
+			&model, img, nil, &color.RGBA{150, 150, 150, 255}, 
 			&lightDir, &eye, &center, &up, width, height, 1.5)
 	} else {
 		renderTriangleMesh(
