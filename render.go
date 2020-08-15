@@ -26,7 +26,6 @@ import (
 	//"sort"
 )
 
-// 
 func randColor() color.RGBA {
 	r := uint8(255 * rand.Float64())
 	g := uint8(255 * rand.Float64())
@@ -323,9 +322,11 @@ func parseObj(filePath string) Model {
 				for i:=1; i<len(tok); i++ {
 					indices := strings.Split(tok[i], "/") // coordinate indices
 					v, _ := strconv.Atoi(indices[0])
-					vt, _ := strconv.Atoi(indices[1])
 					vs = append(vs, v - 1)
-					vtextures = append(vtextures, vt - 1)
+					if len(indices) > 1 { // also with textures
+						vt, _ := strconv.Atoi(indices[1])
+						vtextures = append(vtextures, vt - 1)
+					}
 				}
 				model.addFace(&vs)
 				model.addFaceTexture(&vtextures)
@@ -397,13 +398,7 @@ func triangle(
 	v0 *Vec3f, v1 *Vec3f, v2 *Vec3f,  // vertices
 	vertexNormals *[]Vec3f, vertexTextures *[]Vec2f, faceNormal *Vec3f, lightDir *Vec3f,  // vectors
 	img *image.RGBA, textureImage *image.Image, zbuffer *[]float64, 
-	fillColor *color.RGBA, width int, height int) {
-
-	//tw, th := getImageSize(textureImage)
-	//x := ((*vertexTextures)[0].x + (*vertexTextures)[1].x + (*vertexTextures)[2].x) / 3
-	//y := ((*vertexTextures)[0].y + (*vertexTextures)[1].y + (*vertexTextures)[2].y) / 3
-	//r, g, b := getPixelValue(textureImage, int(x * float64(tw)), int(y * float64(th)))
-	////fill := color.RGBA{uint8(I * float64(r)), uint8(I * float64(g)), uint8(I * float64(b)), 255}
+	fillColor *color.RGBA, width int, height int, specCoeff float64) {
 	
 	pts := []*Vec3f{v0, v1, v2}
 
@@ -433,9 +428,9 @@ func triangle(
 				spec = math.Max(0.0, spec)
 				var fill color.RGBA
 				if textureImage == nil {
-					fill = getColor(*fillColor, diff, spec)
+					fill = getColor(*fillColor, diff, spec, specCoeff)
 				} else {
-					fill = getColorFromTexture(textureImage, vertexTextures, &v, diff, spec)
+					fill = getColorFromTexture(textureImage, vertexTextures, &v, diff, spec, specCoeff)
 				}
 				img.Set(int(P.x), int(P.y), fill)
 			}
@@ -465,7 +460,7 @@ func renderWireframe(model *Model, img *image.RGBA, color *color.RGBA, width int
 func renderTriangleMesh(
 	model *Model, img *image.RGBA, textureImage *image.Image, 
 	fillColor *color.RGBA, lightDir *Vec3f, eye *Vec3f, center *Vec3f, up *Vec3f,
-	width int, height int, scale float64) {
+	width int, height int, scale float64, specCoeff float64) {
 	// fill
 	lightDir.normalizeL2()
 
@@ -491,16 +486,19 @@ func renderTriangleMesh(
 		faceNormal := model.faceNormals[i]
 		for j:=0; j<3; j++ {
 			vs := face[j]
-			vts := faceTexture[j]
 
 			world_v := model.vertices[vs]
 			world_v = world_v.normalizeCenteredCube(model) // Normalize coordinates to [0, 1] cube by min/max value
 			screenCoords[j] = worldToScreen(&world_v, model, width, height, scale) // project to screen
 			vertexNormals[j] = model.vertexNormals[vs]
-			vertexTextures[j] = model.textureCoordinates[vts]
+
+			if len(faceTexture) > 0 {
+				vts := faceTexture[j]
+				vertexTextures[j] = model.textureCoordinates[vts]
+			}
 		}
 		// render triangle
-		triangle(&screenCoords[0], &screenCoords[1], &screenCoords[2], &vertexNormals, &vertexTextures, &faceNormal, lightDir, img, textureImage, &zbuffer, fillColor, width, height)
+		triangle(&screenCoords[0], &screenCoords[1], &screenCoords[2], &vertexNormals, &vertexTextures, &faceNormal, lightDir, img, textureImage, &zbuffer, fillColor, width, height, specCoeff)
 	}
 }
 
@@ -565,18 +563,18 @@ func getPixelValue(img *image.Image, x int, y int) (uint8, uint8, uint8) {
 	return uint8(r / 257), uint8(g / 257), uint8(b / 257)
 }
 
-func getColorFromTexture(img *image.Image, vertexTextures *[]Vec2f, barycentric *Vec3f, diff float64, spec float64) color.RGBA {
+func getColorFromTexture(img *image.Image, vertexTextures *[]Vec2f, barycentric *Vec3f, diff float64, spec float64, specCoeff float64) color.RGBA {
 	width, height := getImageSize(img)
 	x := (*vertexTextures)[0].x * barycentric.x + (*vertexTextures)[1].x * barycentric.y + (*vertexTextures)[2].x * barycentric.z 
 	y := (*vertexTextures)[0].y * barycentric.x + (*vertexTextures)[1].y * barycentric.y + (*vertexTextures)[2].y * barycentric.z 
 	r, g, b := getPixelValue(img, int(x * float64(width)), int(y * float64(height)))
-	return getColor(color.RGBA{r, g, b, 255}, diff, spec)
+	return getColor(color.RGBA{r, g, b, 255}, diff, spec, specCoeff)
 } 
 
-func getColor(fillColor color.RGBA, diff float64, spec float64) color.RGBA {
+func getColor(fillColor color.RGBA, diff float64, spec float64, specCoeff float64) color.RGBA {
 	r, g, b := fillColor.R, fillColor.G, fillColor.B
 	
-	coeff := diff + 1.2 * spec
+	coeff := diff + specCoeff * spec
 
 	r = uint8(math.Min(5 + float64(r) * coeff, 255))
 	g = uint8(math.Min(5 + float64(g) * coeff, 255))
@@ -616,28 +614,30 @@ func main() {
 	}
 	textureImage, _, _ := image.Decode(file)
 
+	// Report
 	fmt.Println("Number of faces: ", model.nFaces())
 	fmt.Println("Number of vertices: ", model.nVertices())
 	fmt.Println("Number of textures coordinates: ", len(model.textureCoordinates))
 	fmt.Println("Number of face textures: ", len(model.faceTextures))
-	
-	ratio := model.aspectRatio()
 
-	// default
-	eye := newVec3f(0, 0, 1)
+	// Settings
+	eye := newVec3f(-1, 0, -1)
 	center := newVec3f(0, 0, 0)
 	up := newVec3f(0, 1, 0)
 	lightDir := newVec3f(0, 0, -1)
+	specCoeff := 20.0
+	imageHeight := 1000
 
-	img, width, height := newImage(1000, ratio, true)
+	ratio := model.aspectRatio()
+	img, width, height := newImage(imageHeight, ratio, false)
 	if textureImage == nil {
 		renderTriangleMesh(
-			&model, img, nil, &color.RGBA{150, 150, 150, 255}, 
-			&lightDir, &eye, &center, &up, width, height, 1.5)
+			&model, img, nil, &color.RGBA{218, 165, 32, 255}, 
+			&lightDir, &eye, &center, &up, width, height, 1.5, specCoeff)
 	} else {
 		renderTriangleMesh(
 			&model, img, &textureImage, nil, 
-			&lightDir, &eye, &center, &up, width, height, 1.5)
+			&lightDir, &eye, &center, &up, width, height, 1.5, specCoeff)
 	}
 	// Save
 	f, _ := os.Create(fmt.Sprintf("./results/test.png"))

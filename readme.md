@@ -84,3 +84,4 @@ The stronger specular lighting is, the more "glossy" the object surface becomes.
 - https://people.sc.fsu.edu/~jburkardt/data/obj/obj.html
 - https://groups.csail.mit.edu/graphics/classes/6.837/F03/models/
 - https://casual-effects.com/data/
+- https://github.com/alecjacobson/common-3d-test-models
