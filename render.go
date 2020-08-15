@@ -431,7 +431,6 @@ func triangle(
 				I := math.Max(0.0, phongShading(vertexNormals, lightDir, &v))
 				var fill color.RGBA
 				if textureImage == nil {
-					// default color white
 					r, g, b := fillColor.R, fillColor.G, fillColor.B
 					fill = color.RGBA{uint8(float64(r) * I),uint8(float64(g) * I),uint8(float64(b) * I), 255}
 				} else {
@@ -625,29 +624,20 @@ func main() {
 	eye := newVec3f(0, 0, 1)
 	center := newVec3f(0, 0, 0)
 	up := newVec3f(0, 1, 0)
-	lightDir := newVec3f(0, -1, -1)
+	lightDir := newVec3f(0, -5, -1)
 
+	img, width, height := newImage(1000, ratio, true)
 	
-	n := 40
-
-	for i:=0; i<n; i++ {
-		fmt.Println("Rendering ", i)
-		
-		rad := 2 * math.Pi * float64(i) / float64(n)
-		eye = newVec3f(math.Sin(rad), 0, math.Cos(rad))
-		img, width, height := newImage(1000, ratio, true)
-		
-		if textureImage == nil {
-			renderTriangleMesh(
-				&model, img, nil, &color.RGBA{255, 255, 255, 255}, 
-				&lightDir, &eye, &center, &up, width, height, 1.5)
-		} else {
-			renderTriangleMesh(
-				&model, img, &textureImage, nil, 
-				&lightDir, &eye, &center, &up, width, height, 1.5)
-		}
-		// Save
-		f, _ := os.Create(fmt.Sprintf("./results/camera2/%d.png", i))
-		png.Encode(f, imaging.FlipV(img))
+	if textureImage == nil {
+		renderTriangleMesh(
+			&model, img, nil, &color.RGBA{255, 255, 204, 255}, 
+			&lightDir, &eye, &center, &up, width, height, 1.5)
+	} else {
+		renderTriangleMesh(
+			&model, img, &textureImage, nil, 
+			&lightDir, &eye, &center, &up, width, height, 1.5)
 	}
-}	
+	// Save
+	f, _ := os.Create(fmt.Sprintf("./results/test.png"))
+	png.Encode(f, imaging.FlipV(img))
+}
