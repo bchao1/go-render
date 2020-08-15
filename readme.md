@@ -8,10 +8,9 @@ This is a toy project to learn Go and rendering at the same time.
 </p>
 
 The OG [tinyrenderer](https://github.com/ssloy/tinyrenderer) project helped me alot. It's some great stuff, and I highly recommend everyone check it out.
-<br>
-The code is pretty self-contained. I only used a 3rd-party library `imaging` to flip images vertically. 
 
 ## Usage
+The code is pretty self-contained. I only used a 3rd-party library `imaging` to flip images vertically. 
 
 ```
 go run render.go <path to .obj file> <path to texture file>
@@ -26,6 +25,7 @@ Of course, you can first build `render.go`, and then run the executable:
 go build render.go
 ./render <path to .obj file> <path to texture file>
 ```
+
 You could also play with some other parameters (light direction, camera position), spectral lighting, and etc in `render.go`.
 
 ## Demo 
@@ -83,3 +83,4 @@ The stronger specular lighting is, the more "glossy" the object surface becomes.
 - https://www.prinmath.com/csci5229/OBJ/index.html
 - https://people.sc.fsu.edu/~jburkardt/data/obj/obj.html
 - https://groups.csail.mit.edu/graphics/classes/6.837/F03/models/
+- https://casual-effects.com/data/
