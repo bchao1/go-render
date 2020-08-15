@@ -623,34 +623,13 @@ func main() {
 	
 	ratio := model.aspectRatio()
 
-	//lightDirs := []Vec3f{
-	//	newVec3f(1, 0, 0), 
-	//	newVec3f(1, -0.5, 0),
-	//	newVec3f(1, -1, 0),
-	//	newVec3f(1, -1.5, 0),
-	//	newVec3f(0, -1, 0),
-	//	newVec3f(-1, -1.5, 0),
-	//	newVec3f(-1, -1, 0),
-	//	newVec3f(-1, -0.5, 0),
-	//	newVec3f(-1, 0, 0),
-	//	newVec3f(-1, 0, -0.5),
-	//	newVec3f(-1, 0, -1),
-	//	newVec3f(-1, 0, -1.5),
-	//	newVec3f(0, 0, -1),
-	//	newVec3f(1, 0, -1.5),
-	//	newVec3f(1, 0, -1),
-	//	newVec3f(1, 0, -0.5),
-	//	newVec3f(1, 0, 0),
-	//}
-
 	// default
 	eye := newVec3f(0, 0, 1)
 	center := newVec3f(0, 0, 0)
 	up := newVec3f(0, 1, 0)
-	lightDir := newVec3f(0, -1, 1)
+	lightDir := newVec3f(0, 0, -1)
 
 	img, width, height := newImage(1000, ratio, true)
-	
 	if textureImage == nil {
 		renderTriangleMesh(
 			&model, img, nil, &color.RGBA{150, 150, 150, 255}, 
