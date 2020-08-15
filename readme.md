@@ -15,7 +15,9 @@ The OG [tinyrenderer](https://github.com/ssloy/tinyrenderer) project helped me a
 
 ## Usage
 The code is pretty self-contained. I only used a 3rd-party library `imaging` to flip images vertically. 
-
+<br>
+<br>
+To do your custom render:
 ```
 go run render.go <path to .obj file> <path to texture file>
 ```
