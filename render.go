@@ -621,6 +621,7 @@ func main() {
 	fmt.Println("Number of face textures: ", len(model.faceTextures))
 
 	// Settings
+	// ===========================================
 	eye := newVec3f(-1, 0, -1)
 	center := newVec3f(0, 0, 0)
 	up := newVec3f(0, 1, 0)
@@ -628,12 +629,15 @@ func main() {
 	specCoeff := 20.0
 	imageHeight := 1000
 	outFile := "./results/dragon.png"
+	defaultFill := color.RGBA{218, 165, 32, 255}
+	// ===========================================
 
+	// Rendering
 	ratio := model.aspectRatio()
 	img, width, height := newImage(imageHeight, ratio, false)
 	if textureImage == nil {
 		renderTriangleMesh(
-			&model, img, nil, &color.RGBA{218, 165, 32, 255}, 
+			&model, img, nil, &defaultFill, 
 			&lightDir, &eye, &center, &up, width, height, 1.5, specCoeff)
 	} else {
 		renderTriangleMesh(
