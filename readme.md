@@ -3,7 +3,7 @@
 This is a toy project to learn Go and rendering at the same time.
 
 <p align="center">
-    <img width="400" src="./results/light/light.gif">
+    <img width="400" src="./results/light3/light3.gif">
     <img width="400" src="./results/camera2/camera.gif">
 </p>
 
