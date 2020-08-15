@@ -627,6 +627,7 @@ func main() {
 	lightDir := newVec3f(0, 0, -1)
 	specCoeff := 20.0
 	imageHeight := 1000
+	outFile := "./results/dragon.png"
 
 	ratio := model.aspectRatio()
 	img, width, height := newImage(imageHeight, ratio, false)
@@ -640,6 +641,6 @@ func main() {
 			&lightDir, &eye, &center, &up, width, height, 1.5, specCoeff)
 	}
 	// Save
-	f, _ := os.Create(fmt.Sprintf("./results/test.png"))
+	f, _ := os.Create(outFile)
 	png.Encode(f, imaging.FlipV(img))
 }

@@ -7,7 +7,11 @@ This is a toy project to learn Go and rendering at the same time.
     <img width="400" src="./results/camera2/camera.gif">
 </p>
 
-The OG [tinyrenderer](https://github.com/ssloy/tinyrenderer) project helped me alot. It's some great stuff, and I highly recommend everyone check it out.
+<p align="center">
+    <img width="800" src="./results/dragon.png">
+</p>
+
+The OG [tinyrenderer](https://github.com/ssloy/tinyrenderer) project helped me alot. It's amazing stuff, and I highly recommend everyone check it out.
 
 ## Usage
 The code is pretty self-contained. I only used a 3rd-party library `imaging` to flip images vertically. 
