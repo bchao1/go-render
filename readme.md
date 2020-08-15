@@ -4,6 +4,7 @@ This is a toy project to learn Go and rendering at the same time.
 
 <p align="center">
     <img width="400" src="./results/light/light.gif">
+    <img width="400" src="./results/camera2/camera.gif">
 </p>
 
 The OG [tinyrenderer](https://github.com/ssloy/tinyrenderer) project helped me alot. It's some great stuff, and I highly recommend everyone check it out.

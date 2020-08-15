@@ -1,1 +1,1 @@
-go run render.go data/obj/bunny_2.obj
+go run render.go data/obj/african_head.obj

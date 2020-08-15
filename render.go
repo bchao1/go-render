@@ -159,6 +159,8 @@ func (m *Model) centerAlignShift() {
 	m.max_x += dx 
 	m.min_y += dy 
 	m.max_y += dy
+
+	m.origVertices = append([]Vec3f{}, m.vertices...) // temp
 }
 
 func (v *Vec3f) normalizeL2() {
@@ -178,6 +180,8 @@ func (v *Vec3f) normalizeCenteredCube(m *Model) Vec3f{
 // Model
 type Model struct {
 	vertices []Vec3f
+	origVertices []Vec3f
+
 	faces [][]int
 
 	vertexFaceNeighbors [][]int
@@ -195,7 +199,7 @@ type Model struct {
 }
 
 func newModel() Model{
-	m := Model{min_x: 1e10, min_y: 1e10, max_x: -1e10, max_y: -1e10}
+	m := Model{min_x: math.Inf(1), min_y: math.Inf(1), max_x: math.Inf(-1), max_y: math.Inf(-1)}
 	return m
 }
 
@@ -294,6 +298,11 @@ func (m *Model) transformCoordinates(eye *Vec3f, center *Vec3f, up *Vec3f) {
 	return
 }
 
+func (m *Model) reset() {
+	m.min_x, m.min_y, m.max_x, m.max_y = math.Inf(1), math.Inf(1), math.Inf(-1), math.Inf(-1)
+	m.vertices = append([]Vec3f{}, m.origVertices...)
+}
+
 func parseObj(filePath string) Model {
 	file, _ := os.Open(filePath)
 	defer file.Close()
@@ -340,6 +349,9 @@ func parseObj(filePath string) Model {
 			model.vertexFaceNeighbors[v] = append(model.vertexFaceNeighbors[v], i)
 		} 
 	}
+	
+	model.centerAlignShift()
+
 	return model
 }
 
@@ -465,8 +477,8 @@ func renderTriangleMesh(
 		zbuffer[i] = math.Inf(-1)
 	}
 
-	// Transform coordinates
-	model.centerAlignShift() // center cooridnates so they are zero-centered
+	model.reset()
+	fmt.Println(model.vertices[0])
 	// Now camera is centered
 	model.transformCoordinates(eye, center, up) // Do projections and other transformations, update coordinates
 
@@ -594,35 +606,41 @@ func main() {
 	
 	ratio := model.aspectRatio()
 
-	lightDirs := []Vec3f{
-		newVec3f(1, 0, 0), 
-		newVec3f(1, -0.5, 0),
-		newVec3f(1, -1, 0),
-		newVec3f(1, -1.5, 0),
-		newVec3f(0, -1, 0),
-		newVec3f(-1, -1.5, 0),
-		newVec3f(-1, -1, 0),
-		newVec3f(-1, -0.5, 0),
-		newVec3f(-1, 0, 0),
-		newVec3f(-1, 0, -0.5),
-		newVec3f(-1, 0, -1),
-		newVec3f(-1, 0, -1.5),
-		newVec3f(0, 0, -1),
-		newVec3f(1, 0, -1.5),
-		newVec3f(1, 0, -1),
-		newVec3f(1, 0, -0.5),
-		newVec3f(1, 0, 0),
-	}
+	//lightDirs := []Vec3f{
+	//	newVec3f(1, 0, 0), 
+	//	newVec3f(1, -0.5, 0),
+	//	newVec3f(1, -1, 0),
+	//	newVec3f(1, -1.5, 0),
+	//	newVec3f(0, -1, 0),
+	//	newVec3f(-1, -1.5, 0),
+	//	newVec3f(-1, -1, 0),
+	//	newVec3f(-1, -0.5, 0),
+	//	newVec3f(-1, 0, 0),
+	//	newVec3f(-1, 0, -0.5),
+	//	newVec3f(-1, 0, -1),
+	//	newVec3f(-1, 0, -1.5),
+	//	newVec3f(0, 0, -1),
+	//	newVec3f(1, 0, -1.5),
+	//	newVec3f(1, 0, -1),
+	//	newVec3f(1, 0, -0.5),
+	//	newVec3f(1, 0, 0),
+	//}
 
-	eye := newVec3f(0, 0, 1)
+	// default
+	eye := newVec3f(1, 0, 0)
 	center := newVec3f(0, 0, 0)
 	up := newVec3f(0, 1, 0)
+	lightDir := newVec3f(0, 0, -1)
 
-	for i:=0; i<len(lightDirs); i++ {
+	n := 1
+	for i:=0; i<n; i++{
+		fmt.Println("Rendering ", i)
+		// rad := 2 * math.Pi * float64(i) / float64(n)
+		//eye = newVec3f(math.Sin(rad), 0, math.Cos(rad))
+		fmt.Println(eye)
 
 		img, width, height := newImage(1000, ratio, true)
-		lightDir := lightDirs[i]//newVec3f(0, -1, 0)
-
+		
 		if textureImage == nil {
 			renderTriangleMesh(
 				&model, img, nil, &color.RGBA{255, 255, 255, 255}, 
@@ -632,9 +650,8 @@ func main() {
 				&model, img, &textureImage, nil, 
 				&lightDir, &eye, &center, &up, width, height, 1.5)
 		}
-
 		// Save
-		f, _ := os.Create(fmt.Sprintf("./results/light2/%d.png", i))
+		f, _ := os.Create(fmt.Sprintf("./results/test.png"))
 		png.Encode(f, imaging.FlipV(img))
 	}
 }
