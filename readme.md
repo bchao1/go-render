@@ -25,7 +25,7 @@ Of course, you can first build the `render.go`
 go build render.go
 ./render <path to .obj file> <path to texture file>
 ```
-You could also play with some other parameters (light direction, camera position), spectral lighting, etc in `render.go`.
+You could also play with some other parameters (light direction, camera position), spectral lighting, and etc in `render.go`.
 
 ## Demo 
 
