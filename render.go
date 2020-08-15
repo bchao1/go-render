@@ -576,7 +576,7 @@ func getColorFromTexture(img *image.Image, vertexTextures *[]Vec2f, barycentric 
 func getColor(fillColor color.RGBA, diff float64, spec float64) color.RGBA {
 	r, g, b := fillColor.R, fillColor.G, fillColor.B
 	
-	coeff := diff + 0.8 * spec
+	coeff := diff + 1.2 * spec
 
 	r = uint8(math.Min(5 + float64(r) * coeff, 255))
 	g = uint8(math.Min(5 + float64(g) * coeff, 255))

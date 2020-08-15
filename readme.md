@@ -53,6 +53,13 @@ Kudos to the author of [this article](https://blenderartists.org/t/uv-unwrapped-
 |![img](./results/light/-10.png)|![img](./results/light/-5.png)|![img](./results/light/-2.png)|![img](./results/light/-1.png)|
 ![img](./results/light/10.png)|![img](./results/light/5.png)|![img](./results/light/2.png)|![img](./results/light/1.png)|
 
+> Specular lighting
+
+The stronger specular lighting is, the more "glossy" the object surface becomes. I simply used uniform power for each pixel since specular intensity is not specified in my texture files.
+|No specular|Some specular (used)|Intense specular|
+|--|--|--|
+|![img](./results/specular/none.png)|![img](./results/specular/moderate.png)|![img](./results/specular/strong.png)|
+
 ## `.obj` sources
 - https://www.prinmath.com/csci5229/OBJ/index.html
 - https://people.sc.fsu.edu/~jburkardt/data/obj/obj.html
