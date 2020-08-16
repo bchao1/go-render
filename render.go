@@ -621,20 +621,22 @@ func main() {
 	fmt.Println("Number of face textures: ", len(model.faceTextures))
 
 	// Settings
+	// All .obj models are preprocessed in the code to be centered at (0, 0).
 	// ===========================================
-	eye := newVec3f(-1, 0, -1)
-	center := newVec3f(0, 0, 0)
-	up := newVec3f(0, 1, 0)
-	lightDir := newVec3f(0, 0, -1)
-	specCoeff := 20.0
-	imageHeight := 1000
-	outFile := "./results/dragon.png"
-	defaultFill := color.RGBA{218, 165, 32, 255}
+	eye := newVec3f(-1, 0, -1) // Position of camera
+	center := newVec3f(0, 0, 0) // Camera lookAt
+	up := newVec3f(0, 1, 0) // Vertical axis for camera
+	lightDir := newVec3f(0, -2, -1) // Light direction (poiting at)
+	specCoeff := 20.0 // weight for spectral lighting
+	imageHeight := 1000 // Height (in pixels) of output image
+	background := true // black background for output image
+	outFile := "./results/test.png" // Output file path
+	defaultFill := color.RGBA{218, 165, 32, 255} // Color to fill if no texture file is specified
 	// ===========================================
 
 	// Rendering
 	ratio := model.aspectRatio()
-	img, width, height := newImage(imageHeight, ratio, false)
+	img, width, height := newImage(imageHeight, ratio, background)
 	if textureImage == nil {
 		renderTriangleMesh(
 			&model, img, nil, &defaultFill, 
