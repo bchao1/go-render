@@ -544,7 +544,8 @@ func flatShading(faceNormal *Vec3f, lightDir *Vec3f) float64 {
 	return n
 }
 
-// Utils
+// image utils
+
 func newImage(height int, aspectRatio float64, fill bool) (*image.RGBA, int, int){
 	width := int(aspectRatio * float64(height))
 	upLeft := image.Point{0, 0}
@@ -557,7 +558,6 @@ func newImage(height int, aspectRatio float64, fill bool) (*image.RGBA, int, int
 	return img, width, height
 }
 
-// image utils
 func getPixelValue(img *image.Image, x int, y int) (uint8, uint8, uint8) {
 	r, g, b, _ := (*img).At(x, y).RGBA()
 	return uint8(r / 257), uint8(g / 257), uint8(b / 257)
@@ -589,20 +589,21 @@ func getImageSize(img *image.Image)(int, int) {
 	return bounds.Max.X, bounds.Max.Y
 }
 
-func main() {
-	// Parse .obj file
-	if len(os.Args) == 1 {
+// Command Line
+
+func parseArgs(args *[]string) (Model, image.Image) {
+	if len(*args) == 1 {
 		fmt.Println("Specify input file!")
 		os.Exit(1)
 	}
 
-	objPath := os.Args[1]
+	objPath := (*args)[1]
 	fmt.Println("Using .obj file: ", objPath)
 	model := parseObj(objPath)
 
 	var texturePath string
-	if len(os.Args) > 2 {
-		texturePath = os.Args[2]
+	if len(*args) > 2 {
+		texturePath = (*args)[2]
 		fmt.Println("Using texture file: ", texturePath)
 	} else {
 		fmt.Println("No texture file specified. Using default color.")
@@ -613,12 +614,16 @@ func main() {
 		fmt.Println("Texture file does not exist. Using default color.")
 	}
 	textureImage, _, _ := image.Decode(file)
+	return model, textureImage
+}
+
+func main() {
+	// Parse Cmd arguments
+	model, textureImage := parseArgs(&os.Args)
 
 	// Report
 	fmt.Println("Number of faces: ", model.nFaces())
 	fmt.Println("Number of vertices: ", model.nVertices())
-	fmt.Println("Number of textures coordinates: ", len(model.textureCoordinates))
-	fmt.Println("Number of face textures: ", len(model.faceTextures))
 
 	// Settings
 	// All .obj models are preprocessed in the code to be centered at (0, 0).
@@ -637,15 +642,16 @@ func main() {
 	// Rendering
 	ratio := model.aspectRatio()
 	img, width, height := newImage(imageHeight, ratio, background)
-	if textureImage == nil {
-		renderTriangleMesh(
-			&model, img, nil, &defaultFill, 
-			&lightDir, &eye, &center, &up, width, height, 1.5, specCoeff)
-	} else {
-		renderTriangleMesh(
-			&model, img, &textureImage, nil, 
-			&lightDir, &eye, &center, &up, width, height, 1.5, specCoeff)
+	
+	var textureAddress *image.Image
+	if textureImage != nil {
+		textureAddress = &textureImage
 	}
+
+	renderTriangleMesh(
+			&model, img, textureAddress, &defaultFill, 
+			&lightDir, &eye, &center, &up, width, height, 1.5, specCoeff)
+
 	// Save
 	f, _ := os.Create(outFile)
 	png.Encode(f, imaging.FlipV(img))
