@@ -1,6 +1,6 @@
 # go-render
 
-This is a toy project to learn Go and rendering at the same time.
+A simple renderer written in Go.
 
 <p align="center">
     <img width="400" src="./results/light3/light3.gif">
