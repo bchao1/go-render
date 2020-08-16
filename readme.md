@@ -21,7 +21,7 @@ To do your custom render:
 ```
 go run render.go <path to .obj file> <path to texture file>
 ```
-For example, in `run.sh`:
+For example, see `run.sh`:
 ```
 go run data/obj/bunny_2.obj data/textures/bunny_texture.jpg
 ```
@@ -32,7 +32,17 @@ go build render.go
 ./render <path to .obj file> <path to texture file>
 ```
 
+### Customization
 You could also play with some other parameters (light direction, camera position, spectral lighting, and etc) in `render.go`.
+- `eye`: The camera position. Default is (0, 0, 1).
+- `center`: Position the camera is looking at Default is (0, 0, 0).
+- `up`: The vertical axis of the camera. Default is (0, 1, 0), which is the y-axis.
+- `lightDir`: Light ray direction. Default is (0, 0, -1), which means the light is parellel to user's eye.
+- `specCoeff`: Weight of spectral lighting. (For the shiny dragon above, I used 20.0)
+- `imageHeight`: Pixel height of output image.
+- `background`: Whether to color output image background black. If not, then output image has transparent background.
+- `outFile`: Render output file path.
+- `defaultFill`: If no texture is specified, use this color.
 
 ## Demo 
 

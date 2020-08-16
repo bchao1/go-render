@@ -642,7 +642,7 @@ func main() {
 	// Rendering
 	ratio := model.aspectRatio()
 	img, width, height := newImage(imageHeight, ratio, background)
-	
+
 	var textureAddress *image.Image
 	if textureImage != nil {
 		textureAddress = &textureImage
