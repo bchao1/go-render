@@ -1,6 +1,6 @@
 # go-render
 
-A simple renderer written in Go.
+A simple renderer (rasterization-based) written in Go.
 
 <p align="center">
     <img width="400" src="./results/light3/light3.gif">
